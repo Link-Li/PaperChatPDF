@@ -14,11 +14,11 @@
 
 ## pdf文件解析
 
-- LlamaIndex
-- LangChain
-- fitz
+- LlamaIndex   pymupdf
+- LangChain    pypdf
+- fitz   PyMuPDF
+- borb
 - PyPDF2
-- pdfminer3k
+- pdfminer
 - PDFQuery
-- PDFMiner
 - pdfplumber
