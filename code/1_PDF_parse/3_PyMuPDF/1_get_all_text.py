@@ -11,16 +11,24 @@ import sys, pathlib, fitz
 
 
 file_path = "/data_cbs/zhenli/code/PaperChatPDF/dataset/pdf_data/2312.09251.pdf"
+# file_path = "/data_cbs/zhenli/code/PaperChatPDF/dataset/pdf_data/Multimodal-Intelligence.pdf"
 with fitz.open(file_path) as doc:  # open document
-    text = [page.get_text("blocks", sort=True) for page in doc]
+    # all_text = [page.get_text("blocks", sort=True) for page in doc]
+    #
+    # tables = [page.find_tables() for page in doc]
+    #
+    # tab_text = [tab.extract() for tab in doc[6].find_tables().tables]
+    #
+    text = doc[0].get_text(clip=[124.68500518798828, 103.16062927246094, 470.5433349609375, 139.75802612304688], sort=True)
 
-    tables = [page.find_tables() for page in doc]
+    for page in doc:
+        table = page.find_tables()
+        image = page.get_image_info()
+        a = 1
+    # text = doc[0].get_fonts()
 
-    tab_text = [tab.extract() for tab in doc[6].find_tables().tables]
-
-    text = doc[1].get_text(clip=(355.41043853759766, 165.8285705566406, 370.2895050048828, 299.0965881347656), sort=True)
 
 # write as a binary file to support non-ASCII characters
 # pathlib.Path(file_path + ".txt").write_bytes(text.encode())
 
-a  = 1
+a = 1
