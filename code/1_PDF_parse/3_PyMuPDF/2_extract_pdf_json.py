@@ -6,6 +6,7 @@
 @Description : 
 """
 
+import os
 import re
 import json
 import sys, pathlib, fitz
@@ -26,12 +27,37 @@ def get_max_dict_value(get_dict):
     return max_res
 
 
-file_path = "/data_cbs/zhenli/code/PaperChatPDF/dataset/pdf_data/2312.09251.pdf"
-# file_path = "/data_cbs/zhenli/code/PaperChatPDF/dataset/pdf_data/ICON.pdf"
-# file_path = "/data_cbs/zhenli/code/PaperChatPDF/dataset/pdf_data/Multimodal-Intelligence.pdf"
+# 获取正文的开头和结尾x轴坐标
+def get_content_begin_end_bbox(bbox_list):
+    paper_content_begin_bbox, paper_content_end_bbox = [], []
+    begin_bbox_dict = {}
+    end_bbox_dict = {}
+    for bbox in bbox_list:
+        update_add_dict_value(begin_bbox_dict, round(bbox[0]), 1)
+        update_add_dict_value(end_bbox_dict, round(bbox[2]), 1)
+    begin_bbox_sort = sorted(begin_bbox_dict.items(), key=lambda x: x[1], reverse=True)
+    end_bbox_sort = sorted(end_bbox_dict.items(), key=lambda x: x[1], reverse=True)
+    if (begin_bbox_sort[0][1] / len(bbox_list) - begin_bbox_sort[1][1] / len(bbox_list) < 0.05) and (end_bbox_sort[0][1] / len(bbox_list) - end_bbox_sort[1][1] / len(bbox_list) < 0.05):
+        paper_content_begin_bbox = [begin_bbox_sort[0][0], begin_bbox_sort[1][0]]
+        paper_content_end_bbox = [end_bbox_sort[0][0], end_bbox_sort[1][0]]
+    else:
+        paper_content_begin_bbox = [begin_bbox_sort[0][0]]
+        paper_content_end_bbox = [end_bbox_sort[0][0]]
+    paper_content_begin_bbox.sort()
+    paper_content_end_bbox.sort()
+    return paper_content_begin_bbox, paper_content_end_bbox
 
-save_path = "/data_cbs/zhenli/code/PaperChatPDF/dataset/output_data/2312.09251.json"
-# save_path = "/data_cbs/zhenli/code/PaperChatPDF/dataset/output_data/ICON.json"
+
+
+root_path = os.path.abspath(os.path.join(os.getcwd(), "../../.."))
+
+# file_path = root_path + "/dataset/pdf_data/2312.09251.pdf"
+file_path = root_path + "/dataset/pdf_data/ICON.pdf"
+# file_path = root_path + "/dataset/pdf_data/Self-Alignment.pdf"
+
+# save_path = root_path + "/dataset/output_data/2312.09251.json"
+save_path = root_path + "/dataset/output_data/ICON.json"
+# save_path = root_path + "/dataset/output_data/Self-Alignment.json"
 
 # 正文的字体大小
 paper_content_size = 0
@@ -43,6 +69,10 @@ paper_content_right_bbox = 400
 paper_content_top_bbox = 0
 # 正文最下面边的x轴位置
 paper_content_bottom_bbox = 800
+# 正文开头x轴位置，可能有1-2个
+paper_content_begin_bbox = []
+# 正文结尾x轴位置，可能有1-2个
+paper_content_end_bbox = []
 
 with fitz.open(file_path) as doc:  # open document
     # 读取所有文本的字号，用来确认正文的字号，将大于正文字号的作为标题候选，小于正文字号的删除
@@ -52,8 +82,10 @@ with fitz.open(file_path) as doc:  # open document
     right_bbox_dict = {}
     top_bbox_dict = {}
     bottom_bbox_dict = {}
-    # 读取摘要的坐标
+    # 读取摘要的坐标，用于区分正文部分和标题部分
     abstract_bbox = []
+    # 保存所有的bbox坐标
+    bbox_list = []
 
     # 读取所有文本的开头坐标，来进行区分不同的段落
     # 段落相关的变量
@@ -69,10 +101,12 @@ with fitz.open(file_path) as doc:  # open document
             update_add_dict_value(bottom_bbox_dict, bbox[3], 1)
             if len(block) == 4 and block["type"] == 0:
                 for line in block["lines"]:
+                    bbox_list.append(line["bbox"])
                     for span in line["spans"]:
                         size = round(span["size"])
                         text = span["text"]
                         update_add_dict_value(word_size_dict, size, len(text.split(" ")))
+                        # bbox_list.append(span["bbox"])
 
                         if "abstract" == text.strip().lower() and len(abstract_bbox) == 0:
                             abstract_bbox = span["bbox"]
@@ -91,6 +125,7 @@ with fitz.open(file_path) as doc:  # open document
     paper_content_right_bbox = get_max_dict_value(right_bbox_dict)[0] + 10
     paper_content_top_bbox = get_max_dict_value(top_bbox_dict)[0] - 10
     paper_content_bottom_bbox = get_max_dict_value(bottom_bbox_dict)[0] + 10
+    paper_content_begin_bbox, paper_content_end_bbox = get_content_begin_end_bbox(bbox_list)
 
     page_text = []
     title_list = []  # 标题候选
