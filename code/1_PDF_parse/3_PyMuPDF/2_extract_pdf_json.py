@@ -38,11 +38,10 @@ def get_content_begin_end_bbox(bbox_list):
     begin_bbox_sort = sorted(begin_bbox_dict.items(), key=lambda x: x[1], reverse=True)
     end_bbox_sort = sorted(end_bbox_dict.items(), key=lambda x: x[1], reverse=True)
     if (begin_bbox_sort[0][1] / len(bbox_list) - begin_bbox_sort[1][1] / len(bbox_list) < 0.05) and (end_bbox_sort[0][1] / len(bbox_list) - end_bbox_sort[1][1] / len(bbox_list) < 0.05):
-        paper_content_begin_bbox = [begin_bbox_sort[0][0], begin_bbox_sort[1][0]]
-        paper_content_end_bbox = [end_bbox_sort[0][0], end_bbox_sort[1][0]]
+        paper_content_begin_bbox = [begin_bbox_sort[0][0]-2, begin_bbox_sort[1][0]-2]
+        paper_content_end_bbox = [end_bbox_sort[0][0]+2, end_bbox_sort[1][0]+2]
     else:
-        paper_content_begin_bbox = [begin_bbox_sort[0][0]]
-        paper_content_end_bbox = [end_bbox_sort[0][0]]
+
     paper_content_begin_bbox.sort()
     paper_content_end_bbox.sort()
     return paper_content_begin_bbox, paper_content_end_bbox
@@ -51,13 +50,15 @@ def get_content_begin_end_bbox(bbox_list):
 
 root_path = os.path.abspath(os.path.join(os.getcwd(), "../../.."))
 
-# file_path = root_path + "/dataset/pdf_data/2312.09251.pdf"
-file_path = root_path + "/dataset/pdf_data/ICON.pdf"
+file_path = root_path + "/dataset/pdf_data/2312.09251.pdf"
+# file_path = root_path + "/dataset/pdf_data/ICON.pdf"
 # file_path = root_path + "/dataset/pdf_data/Self-Alignment.pdf"
+# file_path = root_path + "/dataset/pdf_data/Multimodal-Intelligence.pdf"
 
-# save_path = root_path + "/dataset/output_data/2312.09251.json"
-save_path = root_path + "/dataset/output_data/ICON.json"
+save_path = root_path + "/dataset/output_data/2312.09251.json"
+# save_path = root_path + "/dataset/output_data/ICON.json"
 # save_path = root_path + "/dataset/output_data/Self-Alignment.json"
+# save_path = root_path + "/dataset/output_data/Multimodal-Intelligence.json"
 
 # 正文的字体大小
 paper_content_size = 0
@@ -77,6 +78,8 @@ paper_content_end_bbox = []
 with fitz.open(file_path) as doc:  # open document
     # 读取所有文本的字号，用来确认正文的字号，将大于正文字号的作为标题候选，小于正文字号的删除
     word_size_dict = {}
+    # 读取图片或者表格的文本字号
+    table_img_content_size_dict = {}
     # 读取所有的坐标
     left_bbox_dict = {}
     right_bbox_dict = {}
@@ -84,8 +87,17 @@ with fitz.open(file_path) as doc:  # open document
     bottom_bbox_dict = {}
     # 读取摘要的坐标，用于区分正文部分和标题部分
     abstract_bbox = []
+    # 读取摘要的字号大小，用来获取其他标题
+    abstract_size = 0
+    # 获取introduction的字号大小，要求introduction的文本要以数字开头
+    introduction_size = 0
+    # 标题是否需要大于等于正文字体大小
+    title_size_big_than_paper_content_size = False
     # 保存所有的bbox坐标
     bbox_list = []
+
+    # 判断文本开头是否为figure 1或者table 1开头的正则
+    match_table_img_patter = re.compile("^(figure|table)(\s?)(\d+)")
 
     # 读取所有文本的开头坐标，来进行区分不同的段落
     # 段落相关的变量
@@ -110,22 +122,20 @@ with fitz.open(file_path) as doc:  # open document
 
                         if "abstract" == text.strip().lower() and len(abstract_bbox) == 0:
                             abstract_bbox = span["bbox"]
+                            abstract_size = round(span["size"])
 
-                        # if word_size_dict.get(size, None) is None:
-                        #     word_size_dict[size] = len(text.split(" "))
-                        # else:
-                        #     word_size_dict[size] += len(text.split(" "))
+                        if match_table_img_patter.match(text.strip().lower()):
+                            update_add_dict_value(table_img_content_size_dict, size, 1)
 
-    # max_num_size = [0, 0]  # [size, num]
-    # for size, num in word_size_dict.items():
-    #     if num > max_num_size[1]:
-    #         max_num_size = [size, num]
     paper_content_size = get_max_dict_value(word_size_dict)[0]
     paper_content_left_bbox = get_max_dict_value(left_bbox_dict)[0] - 10
     paper_content_right_bbox = get_max_dict_value(right_bbox_dict)[0] + 10
     paper_content_top_bbox = get_max_dict_value(top_bbox_dict)[0] - 10
     paper_content_bottom_bbox = get_max_dict_value(bottom_bbox_dict)[0] + 10
     paper_content_begin_bbox, paper_content_end_bbox = get_content_begin_end_bbox(bbox_list)
+    table_img_content_size = get_max_dict_value(table_img_content_size_dict)[0]
+    if abstract_size > paper_content_size:
+        title_size_big_than_paper_content_size = True
 
     page_text = []
     title_list = []  # 标题候选
@@ -179,8 +189,8 @@ with fitz.open(file_path) as doc:  # open document
                                 and span_text not in table_text_set:
                             if span_text[-1] == "-":
                                 span_text = span_text[:-1]
-                            else:
-                                span_text += " "
+                            # else:
+                            #     span_text += " "
                             line_text.append([line_size, span_text])
                     # line_text = "\n".join(line_text)
                     if len(line_text) > 0:
@@ -188,6 +198,8 @@ with fitz.open(file_path) as doc:  # open document
 
         # 抽取论文主要内容，并对不同段落进行分段落，同时识别小标题，并对小标题下面的内容进行区分
         block_text = []
+        block_table_img_list = []
+        block_table_img_id_set = set()
         for block in page_text_json["blocks"]:
             if len(block) == 4 and block["type"] == 0:
                 line_text = []
@@ -196,10 +208,37 @@ with fitz.open(file_path) as doc:  # open document
                     for span in line["spans"]:
                         size = round(span["size"])
                         text = span["text"]
+                        font = span["font"].lower()
+                        bbox = span["bbox"]
+
+                        # 首页，隔离开标题信息和正文信息
                         if index == 0 and span["bbox"][1] < (abstract_bbox[1] - 5):
                             text = ""
-                        if size == paper_content_size:
-                            span_text.append(text)
+
+                        # 如果文本长度为0，那么直接跳过
+                        if len(text.strip().lower()) == 0:
+                            continue
+
+                        # 将表格和图片的说明信息的block存储起来，用于后续解析
+                        if id(block) not in block_table_img_id_set \
+                                and size == table_img_content_size \
+                                and match_table_img_patter.match(text.strip().lower()):
+                            block_table_img_list.append(block)
+                            block_table_img_id_set.add(id(block))
+
+                        # 判断是标题还是正文
+                        if ((size > paper_content_size and title_size_big_than_paper_content_size is True) or (
+                                size >= paper_content_size and title_size_big_than_paper_content_size is False)) \
+                                and ("medi" in font or 'bold' in font):
+                            span_text.append(f"{chr(1)}{size}{chr(1)}{text}{chr(1)}")
+                        elif size == paper_content_size:
+                            # 判断正文是否都在指定的坐标范围之内
+                            paper_content_flag = 1
+                            for paper_begin_bbox, paper_end_bbox in zip(paper_content_begin_bbox, paper_content_end_bbox):
+                                if not(round(bbox[0]) >= paper_begin_bbox and round(bbox[1]) <= paper_end_bbox):
+                                    paper_content_flag = 0
+                            if paper_content_flag == 1:
+                                span_text.append(text)
                     span_text = " ".join(span_text).strip()
                     if len(span_text) > 0 \
                             and not span_text.isdigit()\
@@ -207,16 +246,15 @@ with fitz.open(file_path) as doc:  # open document
                             and span_text not in table_text_set:
                         if span_text[-1] == "-":
                             span_text = span_text[:-1]
-                        else:
-                            span_text += " "
+                        # else:
+                        #     span_text += " "
                         line_text.append(span_text)
                 if len(line_text) > 0:
                     line_text = "\n".join(line_text)
                     block_text.append(line_text)
         block_text = "\n".join(block_text)
         page_text.append(block_text)
-    page_text = "\n\n%\n\n".join(page_text)
-
+    page_text = chr(3).join(page_text)
 
     # 抽取标题
     extract_title = ""
@@ -227,14 +265,14 @@ with fitz.open(file_path) as doc:  # open document
             extract_title = title_info
     extract_title = " ".join([t[1] for t in extract_title]).replace("  ", " ")
 
-
-
-
     # 去除引用标志，类似[ 34 , 35 , 49 ]
     page_text = re.sub("\[[0-9, ]*\]", "", page_text)
     # page_text = re.sub("\([0-9a-zA-Z., ]*\)", "", page_text)
     # 正向预查询，去除类似( Ekman , 1993 ; Datcu and Rothkrantz , 2008 )
     page_text = re.sub("\((?=.*\d{4})(?=.*[a-zA-Z]).*\)", "", page_text)
+
+    # 处理表格和图片的说明文本
+    # block_table_img_list
 
 
 
