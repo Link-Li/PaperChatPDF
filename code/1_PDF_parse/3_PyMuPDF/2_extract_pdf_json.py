@@ -28,20 +28,34 @@ def get_max_dict_value(get_dict):
 
 
 # 获取正文的开头和结尾x轴坐标
+# 获取正文的开头和结尾x轴坐标
 def get_content_begin_end_bbox(bbox_list):
+    global width, height
     paper_content_begin_bbox, paper_content_end_bbox = [], []
     begin_bbox_dict = {}
     end_bbox_dict = {}
+    line_length_dict = {}
     for bbox in bbox_list:
         update_add_dict_value(begin_bbox_dict, round(bbox[0]), 1)
         update_add_dict_value(end_bbox_dict, round(bbox[2]), 1)
+        update_add_dict_value(line_length_dict, round(bbox[2] - bbox[0]), 1)
     begin_bbox_sort = sorted(begin_bbox_dict.items(), key=lambda x: x[1], reverse=True)
     end_bbox_sort = sorted(end_bbox_dict.items(), key=lambda x: x[1], reverse=True)
-    if (begin_bbox_sort[0][1] / len(bbox_list) - begin_bbox_sort[1][1] / len(bbox_list) < 0.05) and (end_bbox_sort[0][1] / len(bbox_list) - end_bbox_sort[1][1] / len(bbox_list) < 0.05):
+    line_length_sort = sorted(line_length_dict.items(), key=lambda x: x[1], reverse=True)
+    max_num_line_length = line_length_sort[0][0]
+    if max_num_line_length / width < 0.5:
         paper_content_begin_bbox = [begin_bbox_sort[0][0]-2, begin_bbox_sort[1][0]-2]
         paper_content_end_bbox = [end_bbox_sort[0][0]+2, end_bbox_sort[1][0]+2]
     else:
+        paper_content_begin_bbox = [begin_bbox_sort[0][0]-2]
+        paper_content_end_bbox = [end_bbox_sort[0][0]+2]
 
+    # if (begin_bbox_sort[0][1] / len(bbox_list) - begin_bbox_sort[1][1] / len(bbox_list) < 0.05) and (end_bbox_sort[0][1] / len(bbox_list) - end_bbox_sort[1][1] / len(bbox_list) < 0.05):
+    #     paper_content_begin_bbox = [begin_bbox_sort[0][0], begin_bbox_sort[1][0]]
+    #     paper_content_end_bbox = [end_bbox_sort[0][0], end_bbox_sort[1][0]]
+    # else:
+    #     paper_content_begin_bbox = [begin_bbox_sort[0][0]]
+    #     paper_content_end_bbox = [end_bbox_sort[0][0]]
     paper_content_begin_bbox.sort()
     paper_content_end_bbox.sort()
     return paper_content_begin_bbox, paper_content_end_bbox
@@ -50,15 +64,15 @@ def get_content_begin_end_bbox(bbox_list):
 
 root_path = os.path.abspath(os.path.join(os.getcwd(), "../../.."))
 
-file_path = root_path + "/dataset/pdf_data/2312.09251.pdf"
+# file_path = root_path + "/dataset/pdf_data/2312.09251.pdf"
 # file_path = root_path + "/dataset/pdf_data/ICON.pdf"
 # file_path = root_path + "/dataset/pdf_data/Self-Alignment.pdf"
-# file_path = root_path + "/dataset/pdf_data/Multimodal-Intelligence.pdf"
+file_path = root_path + "/dataset/pdf_data/Multimodal-Intelligence.pdf"
 
-save_path = root_path + "/dataset/output_data/2312.09251.json"
+# save_path = root_path + "/dataset/output_data/2312.09251.json"
 # save_path = root_path + "/dataset/output_data/ICON.json"
 # save_path = root_path + "/dataset/output_data/Self-Alignment.json"
-# save_path = root_path + "/dataset/output_data/Multimodal-Intelligence.json"
+save_path = root_path + "/dataset/output_data/Multimodal-Intelligence.json"
 
 # 正文的字体大小
 paper_content_size = 0
@@ -74,6 +88,8 @@ paper_content_bottom_bbox = 800
 paper_content_begin_bbox = []
 # 正文结尾x轴位置，可能有1-2个
 paper_content_end_bbox = []
+# 文档的大小
+width, height = 0, 0
 
 with fitz.open(file_path) as doc:  # open document
     # 读取所有文本的字号，用来确认正文的字号，将大于正文字号的作为标题候选，小于正文字号的删除
@@ -105,6 +121,7 @@ with fitz.open(file_path) as doc:  # open document
     for page in doc:
         # page_text_json = json.loads(page.get_text("json", sort=True))
         page_text_json = page.get_text("dict", sort=True)
+        width, height = round(page_text_json["width"]), round(page_text_json["height"])
         for block in page_text_json["blocks"]:
             bbox = block["bbox"]
             update_add_dict_value(left_bbox_dict, bbox[0], 1)
@@ -155,6 +172,7 @@ with fitz.open(file_path) as doc:  # open document
                 image_bbox = [min(image_bbox[0], img["bbox"][0]), min(image_bbox[1], img["bbox"][1]),
                               max(image_bbox[2], img["bbox"][2]), max(image_bbox[3], img["bbox"][3])]
             image_text_set = set(page.get_text(clip=image_bbox).split("\n"))
+            image_text_set = set([text.strip() for text in image_text_set])
 
         # 读取表格中的文本
         if len(table_info) > 0:
@@ -164,6 +182,7 @@ with fitz.open(file_path) as doc:  # open document
                 tabel_bbox = [min(tabel_bbox[0], tab.bbox[0]), min(tabel_bbox[1], tab.bbox[1]),
                               max(tabel_bbox[2], tab.bbox[2]), max(tabel_bbox[3], tab.bbox[3])]
             table_text_set = set(page.get_text(clip=tabel_bbox).split("\n"))
+            table_text_set = set([text.strip() for text in table_text_set])
 
         # 获取标题的粗糙信息，存储在title_list中
         if index == 0:
@@ -176,7 +195,7 @@ with fitz.open(file_path) as doc:  # open document
                         span_text = []
                         for span in line["spans"]:
                             size = round(span["size"])
-                            text = span["text"]
+                            text = span["text"].strip()
                             if size > paper_content_size:
                                 span_text.append(text)
                                 line_size = size
@@ -207,7 +226,7 @@ with fitz.open(file_path) as doc:  # open document
                     span_text = []
                     for span in line["spans"]:
                         size = round(span["size"])
-                        text = span["text"]
+                        text = span["text"].strip()
                         font = span["font"].lower()
                         bbox = span["bbox"]
 
@@ -233,10 +252,10 @@ with fitz.open(file_path) as doc:  # open document
                             span_text.append(f"{chr(1)}{size}{chr(1)}{text}{chr(1)}")
                         elif size == paper_content_size:
                             # 判断正文是否都在指定的坐标范围之内
-                            paper_content_flag = 1
+                            paper_content_flag = 0
                             for paper_begin_bbox, paper_end_bbox in zip(paper_content_begin_bbox, paper_content_end_bbox):
-                                if not(round(bbox[0]) >= paper_begin_bbox and round(bbox[1]) <= paper_end_bbox):
-                                    paper_content_flag = 0
+                                if round(bbox[0]) >= paper_begin_bbox and round(bbox[2]) <= paper_end_bbox:
+                                    paper_content_flag = 1
                             if paper_content_flag == 1:
                                 span_text.append(text)
                     span_text = " ".join(span_text).strip()
@@ -246,8 +265,6 @@ with fitz.open(file_path) as doc:  # open document
                             and span_text not in table_text_set:
                         if span_text[-1] == "-":
                             span_text = span_text[:-1]
-                        # else:
-                        #     span_text += " "
                         line_text.append(span_text)
                 if len(line_text) > 0:
                     line_text = "\n".join(line_text)
@@ -267,9 +284,10 @@ with fitz.open(file_path) as doc:  # open document
 
     # 去除引用标志，类似[ 34 , 35 , 49 ]
     page_text = re.sub("\[[0-9, ]*\]", "", page_text)
-    # page_text = re.sub("\([0-9a-zA-Z., ]*\)", "", page_text)
     # 正向预查询，去除类似( Ekman , 1993 ; Datcu and Rothkrantz , 2008 )
     page_text = re.sub("\((?=.*\d{4})(?=.*[a-zA-Z]).*\)", "", page_text)
+    # 待完成，去除类似[Ouyang et al., 2022, Touvron et al., 2023, Bai et al., 2022a]
+    page_text = re.sub("\[(?=.*\d{4})(?=.*[a-zA-Z]).*\]", "", page_text)
 
     # 处理表格和图片的说明文本
     # block_table_img_list
