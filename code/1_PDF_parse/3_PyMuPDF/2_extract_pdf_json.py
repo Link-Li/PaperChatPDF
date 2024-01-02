@@ -30,7 +30,7 @@ def get_max_dict_value(get_dict):
 # 获取正文的开头和结尾x轴坐标
 # 获取正文的开头和结尾x轴坐标
 def get_content_begin_end_bbox(bbox_list):
-    global width, height
+    global width, height, axis_error, max_num_line_length
     paper_content_begin_bbox, paper_content_end_bbox = [], []
     begin_bbox_dict = {}
     end_bbox_dict = {}
@@ -44,11 +44,11 @@ def get_content_begin_end_bbox(bbox_list):
     line_length_sort = sorted(line_length_dict.items(), key=lambda x: x[1], reverse=True)
     max_num_line_length = line_length_sort[0][0]
     if max_num_line_length / width < 0.5:
-        paper_content_begin_bbox = [begin_bbox_sort[0][0]-2, begin_bbox_sort[1][0]-2]
-        paper_content_end_bbox = [end_bbox_sort[0][0]+2, end_bbox_sort[1][0]+2]
+        paper_content_begin_bbox = [begin_bbox_sort[0][0]-axis_error, begin_bbox_sort[1][0]-axis_error]
+        paper_content_end_bbox = [end_bbox_sort[0][0]+axis_error, end_bbox_sort[1][0]+axis_error]
     else:
-        paper_content_begin_bbox = [begin_bbox_sort[0][0]-2]
-        paper_content_end_bbox = [end_bbox_sort[0][0]+2]
+        paper_content_begin_bbox = [begin_bbox_sort[0][0]-axis_error]
+        paper_content_end_bbox = [end_bbox_sort[0][0]+axis_error]
 
     # if (begin_bbox_sort[0][1] / len(bbox_list) - begin_bbox_sort[1][1] / len(bbox_list) < 0.05) and (end_bbox_sort[0][1] / len(bbox_list) - end_bbox_sort[1][1] / len(bbox_list) < 0.05):
     #     paper_content_begin_bbox = [begin_bbox_sort[0][0], begin_bbox_sort[1][0]]
@@ -65,15 +65,19 @@ def get_content_begin_end_bbox(bbox_list):
 root_path = os.path.abspath(os.path.join(os.getcwd(), "../../.."))
 
 # file_path = root_path + "/dataset/pdf_data/2312.09251.pdf"
-# file_path = root_path + "/dataset/pdf_data/ICON.pdf"
+file_path = root_path + "/dataset/pdf_data/ICON.pdf"
 # file_path = root_path + "/dataset/pdf_data/Self-Alignment.pdf"
-file_path = root_path + "/dataset/pdf_data/Multimodal-Intelligence.pdf"
+# file_path = root_path + "/dataset/pdf_data/Multimodal-Intelligence.pdf"
 
 # save_path = root_path + "/dataset/output_data/2312.09251.json"
-# save_path = root_path + "/dataset/output_data/ICON.json"
+save_path = root_path + "/dataset/output_data/ICON.json"
 # save_path = root_path + "/dataset/output_data/Self-Alignment.json"
-save_path = root_path + "/dataset/output_data/Multimodal-Intelligence.json"
+# save_path = root_path + "/dataset/output_data/Multimodal-Intelligence.json"
 
+# 防止误检测的泛化位置偏差
+axis_error = 2
+# 正文一行的长度
+max_num_line_length = 0
 # 正文的字体大小
 paper_content_size = 0
 # 正文最左边的x轴位置
@@ -156,7 +160,6 @@ with fitz.open(file_path) as doc:  # open document
 
     page_text = []
     title_list = []  # 标题候选
-    section_dict = {} # 章节标题及对应的内容
     for index, page in enumerate(doc):
         page_text_json = json.loads(page.get_text("json", sort=False))
         image_info = page.get_image_info()
@@ -256,9 +259,18 @@ with fitz.open(file_path) as doc:  # open document
                             for paper_begin_bbox, paper_end_bbox in zip(paper_content_begin_bbox, paper_content_end_bbox):
                                 if round(bbox[0]) >= paper_begin_bbox and round(bbox[2]) <= paper_end_bbox:
                                     paper_content_flag = 1
+                                    # 判断是否是一段话的开头
+                                    # 但是鉴于有时候line识别的不准，如果开头坐标右移动的太多了，那么就认为不是一段话的开头
+                                    if paper_begin_bbox + \
+                                            (axis_error + max_num_line_length/(7*len(paper_content_begin_bbox))) \
+                                            > round(bbox[0]) > paper_begin_bbox + (axis_error + 2):
+                                        text = chr(2) + text
+                                    # 判断是否是一段话的结尾
+                                    if round(bbox[2]) < paper_end_bbox - (axis_error + 2) and text[-1] == '.':
+                                        text += chr(2)
                             if paper_content_flag == 1:
                                 span_text.append(text)
-                    span_text = " ".join(span_text).strip()
+                    span_text = " ".join(span_text).strip().replace(f"{chr(2)} ", " ")
                     if len(span_text) > 0 \
                             and not span_text.isdigit()\
                             and span_text not in image_text_set\
@@ -282,24 +294,20 @@ with fitz.open(file_path) as doc:  # open document
             extract_title = title_info
     extract_title = " ".join([t[1] for t in extract_title]).replace("  ", " ")
 
-    # 去除引用标志，类似[ 34 , 35 , 49 ]
-    page_text = re.sub("\[[0-9, ]*\]", "", page_text)
-    # 正向预查询，去除类似( Ekman , 1993 ; Datcu and Rothkrantz , 2008 )
-    page_text = re.sub("\((?=.*\d{4})(?=.*[a-zA-Z]).*\)", "", page_text)
-    # 待完成，去除类似[Ouyang et al., 2022, Touvron et al., 2023, Bai et al., 2022a]
-    page_text = re.sub("\[(?=.*\d{4})(?=.*[a-zA-Z]).*\]", "", page_text)
+    # 这里在后期合并数据的时候再进行去除
+    # # 去除引用标志，类似[ 34 , 35 , 49 ]
+    # page_text = re.sub("\[[0-9, ]*\]", "", page_text)
+    # # 正向预查询，去除类似( Ekman , 1993 ; Datcu and Rothkrantz , 2008 )
+    # page_text = re.sub("\((?=.*\d{4})(?=.*[a-zA-Z]).*\)", "", page_text)
+    # # 待完成，去除类似[Ouyang et al., 2022, Touvron et al., 2023, Bai et al., 2022a]
+    # page_text = re.sub("\[(?=.*\d{4})(?=.*[a-zA-Z]).*\]", "", page_text)
 
     # 处理表格和图片的说明文本
     # block_table_img_list
-
-
 
 
     with open(save_path, "w", encoding="utf-8") as f_write:
         f_write.write(extract_title)
         f_write.write("\n\n\n\n\n")
         f_write.write(page_text)
-
-
-
 
