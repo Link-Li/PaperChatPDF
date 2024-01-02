@@ -94,6 +94,9 @@ paper_content_begin_bbox = []
 paper_content_end_bbox = []
 # 文档的大小
 width, height = 0, 0
+# 将所有的图片和文本的说明都存储起来，然后放到最后进行解析
+block_table_img_list = []
+block_table_img_id_set = set()
 
 with fitz.open(file_path) as doc:  # open document
     # 读取所有文本的字号，用来确认正文的字号，将大于正文字号的作为标题候选，小于正文字号的删除
@@ -220,8 +223,6 @@ with fitz.open(file_path) as doc:  # open document
 
         # 抽取论文主要内容，并对不同段落进行分段落，同时识别小标题，并对小标题下面的内容进行区分
         block_text = []
-        block_table_img_list = []
-        block_table_img_id_set = set()
         for block in page_text_json["blocks"]:
             if len(block) == 4 and block["type"] == 0:
                 line_text = []
@@ -303,7 +304,67 @@ with fitz.open(file_path) as doc:  # open document
     # page_text = re.sub("\[(?=.*\d{4})(?=.*[a-zA-Z]).*\]", "", page_text)
 
     # 处理表格和图片的说明文本
-    # block_table_img_list
+    tabel_explain_text_list = []
+    image_explain_text_list = []
+    for block in block_table_img_list:
+        if len(block) == 4 and block["type"] == 0:
+            line_text = []
+            for line in block["lines"]:
+                span_text = []
+                for span in line["spans"]:
+                    size = round(span["size"])
+                    text = span["text"].strip()
+                    font = span["font"].lower()
+                    bbox = span["bbox"]
+
+                    # 首页，隔离开标题信息和正文信息
+                    if index == 0 and span["bbox"][1] < (abstract_bbox[1] - 5):
+                        text = ""
+
+                    # 如果文本长度为0，那么直接跳过
+                    if len(text.strip().lower()) == 0:
+                        continue
+
+                    # 将表格和图片的说明信息的block存储起来，用于后续解析
+                    if id(block) not in block_table_img_id_set \
+                            and size == table_img_content_size \
+                            and match_table_img_patter.match(text.strip().lower()):
+                        block_table_img_list.append(block)
+                        block_table_img_id_set.add(id(block))
+
+                    # 判断是标题还是正文
+                    if ((size > paper_content_size and title_size_big_than_paper_content_size is True) or (
+                            size >= paper_content_size and title_size_big_than_paper_content_size is False)) \
+                            and ("medi" in font or 'bold' in font):
+                        span_text.append(f"{chr(1)}{size}{chr(1)}{text}{chr(1)}")
+                    elif size == paper_content_size:
+                        # 判断正文是否都在指定的坐标范围之内
+                        paper_content_flag = 0
+                        for paper_begin_bbox, paper_end_bbox in zip(paper_content_begin_bbox, paper_content_end_bbox):
+                            if round(bbox[0]) >= paper_begin_bbox and round(bbox[2]) <= paper_end_bbox:
+                                paper_content_flag = 1
+                                # 判断是否是一段话的开头
+                                # 但是鉴于有时候line识别的不准，如果开头坐标右移动的太多了，那么就认为不是一段话的开头
+                                if paper_begin_bbox + \
+                                        (axis_error + max_num_line_length / (7 * len(paper_content_begin_bbox))) \
+                                        > round(bbox[0]) > paper_begin_bbox + (axis_error + 2):
+                                    text = chr(2) + text
+                                # 判断是否是一段话的结尾
+                                if round(bbox[2]) < paper_end_bbox - (axis_error + 2) and text[-1] == '.':
+                                    text += chr(2)
+                        if paper_content_flag == 1:
+                            span_text.append(text)
+                span_text = " ".join(span_text).strip().replace(f"{chr(2)} ", " ")
+                if len(span_text) > 0 \
+                        and not span_text.isdigit() \
+                        and span_text not in image_text_set \
+                        and span_text not in table_text_set:
+                    if span_text[-1] == "-":
+                        span_text = span_text[:-1]
+                    line_text.append(span_text)
+            if len(line_text) > 0:
+                line_text = "\n".join(line_text)
+                block_text.append(line_text)
 
 
     with open(save_path, "w", encoding="utf-8") as f_write:
