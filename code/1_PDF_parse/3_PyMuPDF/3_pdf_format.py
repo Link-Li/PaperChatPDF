@@ -49,6 +49,9 @@ if __name__ == '__main__':
         # 分段落
         paper_content_paragraph = paper_content.replace(f"{chr(2)}{chr(2)}", chr(2)).split(chr(2))
 
+        # 抽一下标题的文字大小，选择最大的，且数量大于3的作为一级标题大小，大于这个字体大小的，默认改成这个字体大小，小于这个字体大小的，默认作为小标题
+        # paper_section_font_size = 0
+
         # 如果paper_content不是abstract开头的，那么加一个默认的标题作为起始标题，名字叫default_section_1
         for index, paragraph in enumerate(paper_content_paragraph):
             if index == 0 and "abstract" not in paragraph.lower():
