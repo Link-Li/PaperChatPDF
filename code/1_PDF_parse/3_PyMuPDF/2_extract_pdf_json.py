@@ -69,10 +69,10 @@ file_path = root_path + "/dataset/pdf_data/ICON.pdf"
 # file_path = root_path + "/dataset/pdf_data/Self-Alignment.pdf"
 # file_path = root_path + "/dataset/pdf_data/Multimodal-Intelligence.pdf"
 
-# save_path = root_path + "/dataset/output_data/2312.09251.json"
-save_path = root_path + "/dataset/output_data/ICON.json"
-# save_path = root_path + "/dataset/output_data/Self-Alignment.json"
-# save_path = root_path + "/dataset/output_data/Multimodal-Intelligence.json"
+# save_path = root_path + "/dataset/output_data/2312.09251.txt"
+save_path = root_path + "/dataset/output_data/ICON.txt"
+# save_path = root_path + "/dataset/output_data/Self-Alignment.txt"
+# save_path = root_path + "/dataset/output_data/Multimodal-Intelligence.txt"
 
 # 防止误检测的泛化位置偏差
 axis_error = 2
@@ -307,6 +307,9 @@ with fitz.open(file_path) as doc:  # open document
     tabel_explain_text_list = []
     image_explain_text_list = []
     for block in block_table_img_list:
+        # no表示还没遇到figure或者table开头的文本
+        # figure 或者 table 表示遇到了figure或者table卡头的文本，那么之后的文本都默认是图片或者表格的说明内容
+        match_table_img_patter_flag = "no"
         if len(block) == 4 and block["type"] == 0:
             line_text = []
             for line in block["lines"]:
@@ -317,58 +320,41 @@ with fitz.open(file_path) as doc:  # open document
                     font = span["font"].lower()
                     bbox = span["bbox"]
 
-                    # 首页，隔离开标题信息和正文信息
-                    if index == 0 and span["bbox"][1] < (abstract_bbox[1] - 5):
-                        text = ""
-
                     # 如果文本长度为0，那么直接跳过
                     if len(text.strip().lower()) == 0:
                         continue
 
-                    # 将表格和图片的说明信息的block存储起来，用于后续解析
-                    if id(block) not in block_table_img_id_set \
-                            and size == table_img_content_size \
-                            and match_table_img_patter.match(text.strip().lower()):
-                        block_table_img_list.append(block)
-                        block_table_img_id_set.add(id(block))
+                    # 判断是不是figure或者table开头，否则跳过
+                    # 遇到过一次figure或者table开头之后，之后的文本就不在跳过
+                    if (not match_table_img_patter.match(text.strip().lower()))  \
+                            and match_table_img_patter_flag == 'no':
+                        continue
+                    elif match_table_img_patter_flag == 'no':
+                        if "figure" in text.strip().lower():
+                            match_table_img_patter_flag = "figure"
+                        elif "table" in text.strip().lower():
+                            match_table_img_patter_flag = "table"
 
-                    # 判断是标题还是正文
-                    if ((size > paper_content_size and title_size_big_than_paper_content_size is True) or (
-                            size >= paper_content_size and title_size_big_than_paper_content_size is False)) \
-                            and ("medi" in font or 'bold' in font):
-                        span_text.append(f"{chr(1)}{size}{chr(1)}{text}{chr(1)}")
-                    elif size == paper_content_size:
-                        # 判断正文是否都在指定的坐标范围之内
-                        paper_content_flag = 0
-                        for paper_begin_bbox, paper_end_bbox in zip(paper_content_begin_bbox, paper_content_end_bbox):
-                            if round(bbox[0]) >= paper_begin_bbox and round(bbox[2]) <= paper_end_bbox:
-                                paper_content_flag = 1
-                                # 判断是否是一段话的开头
-                                # 但是鉴于有时候line识别的不准，如果开头坐标右移动的太多了，那么就认为不是一段话的开头
-                                if paper_begin_bbox + \
-                                        (axis_error + max_num_line_length / (7 * len(paper_content_begin_bbox))) \
-                                        > round(bbox[0]) > paper_begin_bbox + (axis_error + 2):
-                                    text = chr(2) + text
-                                # 判断是否是一段话的结尾
-                                if round(bbox[2]) < paper_end_bbox - (axis_error + 2) and text[-1] == '.':
-                                    text += chr(2)
-                        if paper_content_flag == 1:
-                            span_text.append(text)
+                    span_text.append(text)
                 span_text = " ".join(span_text).strip().replace(f"{chr(2)} ", " ")
                 if len(span_text) > 0 \
-                        and not span_text.isdigit() \
-                        and span_text not in image_text_set \
-                        and span_text not in table_text_set:
+                        and not span_text.isdigit():
                     if span_text[-1] == "-":
                         span_text = span_text[:-1]
                     line_text.append(span_text)
             if len(line_text) > 0:
                 line_text = "\n".join(line_text)
-                block_text.append(line_text)
-
+                if match_table_img_patter_flag == "figure":
+                    image_explain_text_list.append(line_text)
+                elif match_table_img_patter_flag == "table":
+                    tabel_explain_text_list.append(line_text)
 
     with open(save_path, "w", encoding="utf-8") as f_write:
         f_write.write(extract_title)
-        f_write.write("\n\n\n\n\n")
+        f_write.write(chr(5))
         f_write.write(page_text)
+        f_write.write(chr(5))
+        f_write.write(chr(4).join(image_explain_text_list))
+        f_write.write(chr(5))
+        f_write.write(chr(4).join(tabel_explain_text_list))
 
