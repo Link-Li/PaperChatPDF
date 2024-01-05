@@ -3,7 +3,13 @@
 @Time        : 2023/12/20 19:53
 @Author      : noahzhenli
 @Email       : 
-@Description : 
+@Description :
+
+chr(1)chr(6)作为标题的分割符
+chr(2):段落分隔符
+chr(3):页面分隔符
+chr(4):图表说明分隔符
+chr(5):不同部分分隔符，如标题和正文和图表说明之类的
 """
 
 import os
@@ -65,14 +71,14 @@ def get_content_begin_end_bbox(bbox_list):
 root_path = os.path.abspath(os.path.join(os.getcwd(), "../../.."))
 
 # file_path = root_path + "/dataset/pdf_data/2312.09251.pdf"
-file_path = root_path + "/dataset/pdf_data/ICON.pdf"
+# file_path = root_path + "/dataset/pdf_data/ICON.pdf"
 # file_path = root_path + "/dataset/pdf_data/Self-Alignment.pdf"
-# file_path = root_path + "/dataset/pdf_data/Multimodal-Intelligence.pdf"
+file_path = root_path + "/dataset/pdf_data/Multimodal-Intelligence.pdf"
 
 # save_path = root_path + "/dataset/output_data/2312.09251.txt"
-save_path = root_path + "/dataset/output_data/ICON.txt"
+# save_path = root_path + "/dataset/output_data/ICON.txt"
 # save_path = root_path + "/dataset/output_data/Self-Alignment.txt"
-# save_path = root_path + "/dataset/output_data/Multimodal-Intelligence.txt"
+save_path = root_path + "/dataset/output_data/Multimodal-Intelligence.txt"
 
 # 防止误检测的泛化位置偏差
 axis_error = 2
@@ -253,7 +259,7 @@ with fitz.open(file_path) as doc:  # open document
                         if ((size > paper_content_size and title_size_big_than_paper_content_size is True) or (
                                 size >= paper_content_size and title_size_big_than_paper_content_size is False)) \
                                 and ("medi" in font or 'bold' in font):
-                            span_text.append(f"{chr(1)}{size}{chr(1)}{text}{chr(1)}")
+                            span_text.append(f"{chr(6)}{chr(1)}{size}{chr(1)}{text}{chr(1)}{chr(6)}")
                         elif size == paper_content_size:
                             # 判断正文是否都在指定的坐标范围之内
                             paper_content_flag = 0
@@ -276,8 +282,8 @@ with fitz.open(file_path) as doc:  # open document
                             and not span_text.isdigit()\
                             and span_text not in image_text_set\
                             and span_text not in table_text_set:
-                        if span_text[-1] == "-":
-                            span_text = span_text[:-1]
+                        # if span_text[-1] == "-":
+                        #     span_text = span_text[:-1]
                         line_text.append(span_text)
                 if len(line_text) > 0:
                     line_text = "\n".join(line_text)
@@ -294,14 +300,6 @@ with fitz.open(file_path) as doc:  # open document
             title_top_bbox = bbox[1]
             extract_title = title_info
     extract_title = " ".join([t[1] for t in extract_title]).replace("  ", " ")
-
-    # 这里在后期合并数据的时候再进行去除
-    # # 去除引用标志，类似[ 34 , 35 , 49 ]
-    # page_text = re.sub("\[[0-9, ]*\]", "", page_text)
-    # # 正向预查询，去除类似( Ekman , 1993 ; Datcu and Rothkrantz , 2008 )
-    # page_text = re.sub("\((?=.*\d{4})(?=.*[a-zA-Z]).*\)", "", page_text)
-    # # 待完成，去除类似[Ouyang et al., 2022, Touvron et al., 2023, Bai et al., 2022a]
-    # page_text = re.sub("\[(?=.*\d{4})(?=.*[a-zA-Z]).*\]", "", page_text)
 
     # 处理表格和图片的说明文本
     tabel_explain_text_list = []

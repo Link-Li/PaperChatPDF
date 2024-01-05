@@ -12,24 +12,174 @@
 
 require：
 python >= 3.7
+
+
+存储结构：
+[
+    [section_1, size_1,
+        [content, content,
+            [section_2, size_2, [content, content, ...]],
+            [section_2, size_2, [content, content, ...]]
+        ]
+    ],
+    [section_1, size_1,
+        [content, content,
+            [section_2, size_2, [content, content, ...]],
+            [section_2, size_2, [content, content, ...]]
+        ]
+    ],
+]
 """
-
+import json
 import os
+import re
 
 
-def set_paper_content_section_list_last_key(section_list, old_key, new_key):
-    pass
+def update_add_dict_value(up_dict, key, value):
+    if up_dict.get(key, None) is None:
+        up_dict[key] = value
+    else:
+        up_dict[key] += value
+
+
+def get_max_dict_value(get_dict):
+    max_res = [0, 0]  # [key, num]
+    for key, res in get_dict.items():
+        if res > max_res[1]:
+            max_res = [key, res]
+    return max_res
+
+
+def filter_cite(content):
+    # 这里在后期合并数据的时候再进行去除
+    # # 去除引用标志，类似[ 34 , 35 , 49 ]
+    content = re.sub("\[[0-9, ]*\]", "", content)
+    # # 正向预查询，去除类似( Ekman , 1993 ; Datcu and Rothkrantz , 2008 )
+    content = re.sub("\((?=.*\d{4})(?=.*[a-zA-Z]).*\)", "", content)
+    # # 去除类似[Ouyang et al., 2022, Touvron et al., 2023, Bai et al., 2022a]
+    content = re.sub("\[(?=.*\d{4})(?=.*[a-zA-Z]).*\]", "", content)
+    return content
+
+
+def combine_line_to_paragraph(paper_content_section):
+    paragraph_list = []
+    paragraph = []
+    for line in paper_content_section[-1]:
+        if isinstance(line, str):
+            if len(paragraph) == 0:
+                if len(line) > 0:
+                    paragraph = [line]
+                else:
+                    continue
+            elif paragraph[-1][-1] != ".":
+                if len(line) > 0:
+                    if paragraph[-1][-1] == '-':
+                        paragraph[-1] = paragraph[-1][:-1] + chr(1)
+                    paragraph.append(line)
+                else:
+                    continue
+            elif paragraph[-1][-1] == ".":
+                if len(line) > 0:
+                    paragraph.append(line)
+                # 形成新的段落，进行合并
+                elif len(line) == 0:
+                    filter_pargraph = filter_cite(" ".join(paragraph).replace(f"{chr(1)} ", ""))
+                    paragraph_list.append(filter_pargraph)
+                    paragraph = ""
+                    continue
+    return paragraph_list
+
+
+def get_title_font_size(paper_content):
+    paper_content_list = paper_content.split(chr(6))
+    title_list = []
+    for content in paper_content_list:
+        title_list.extend(re.findall("\x01[\S\s]+\x01[\S\s]+\x01", content))
+    # title_list = re.findall("\x06\x01[\S\s]+\x01[\S\s]+\x01\x06", paper_content)
+    font_size_dict = {}
+    for title_info in title_list:
+        font_size, title = title_info.strip(chr(1)).split(chr(1))
+        update_add_dict_value(font_size_dict, font_size, 1)
+    font_size_list = sorted(font_size_dict.items(), key=lambda k: (k[0], k[1]), reverse=True)
+    for font_size in font_size_list:
+        if font_size[1] > 3:
+            return int(font_size[0])
+
+    # 如果没有标题，返回一个0值
+    return 0
+
+
+def insert_paper_content_section_list_content(section_list, content):
+    last_section_1 = section_list[-1]
+    last_section_2 = last_section_1[-1]
+    # 如果最后一个内容结构是[section, font_size, content]
+    if len(last_section_2) > 0 and isinstance(last_section_2[-1], list):
+        section_list[-1][-1][-1][-1].append(content)
+    # 如果最后一个内容的结构
+    else:
+        section_list[-1][-1].append(content)
+
+
+def set_paper_content_section_list_last_key(section_list, old_key, new_key, font_size):
+    if len(section_list) > 0:
+        last_section_1 = section_list[-1]
+        font_size_1 = last_section_1[1]
+        last_section_2 = last_section_1[-1]
+        if len(last_section_2) > 0 and isinstance(last_section_2[-1], list):
+            font_size_2 = last_section_2[-1][1]
+        else:
+            font_size_2 = 0
+    else:
+        last_section_1 = []
+        font_size_1 = font_size
+        last_section_2 = []
+    # 如果有old key，那么说明是将老的标题替换成新的标题
+    if old_key:
+        # 插入二级标题
+        if len(last_section_2) > 0 and isinstance(last_section_2[-1], list) and last_section_2[0] == old_key:
+            last_section_2[-1][0] = new_key
+            section_list[-1][-1][-1] = last_section_2
+        # 插入一级标题
+        elif len(last_section_1) > 0 and last_section_1[0] == old_key:
+            last_section_1[0] = new_key
+            section_list[-1] = last_section_1
+        # 抛出异常
+        else:
+            raise Exception("更新section，和尾部的section无法对应")
+    # 没有老的标题，那么就考虑将新的标题插入到section_list中，这里需要考虑是作为一级标题插入，还是作为二级标题插入
+    else:
+        new_section = [new_key, font_size, []]
+        # 作为一级标题插入
+        if font_size == font_size_1:
+            section_list.append(new_section)
+        # 作为二级标题插入
+        else:
+            section_list[-1][-1].append(new_section)
+
 
 # 获取章节列表的最后一个章节的名称
-def get_paper_content_section_list_last_key(section_list):
-    pass
-
-
+def get_paper_content_section_list_last_section(section_list):
+    # 防止第一次是abstract的时候，section_list为空
+    if len(section_list) > 0:
+        last_section_1 = section_list[-1]
+        last_section_2 = last_section_1[-1]
+        # 可以进行合并的标题，必须满足样式是[section, font_size, []]，并且最后的内容是空的
+        # 因为PDF识别的时候，有时候会把一个标题识别成多行
+        if len(last_section_2) > 0 and isinstance(last_section_2[-1], list) and len(last_section_2[-1][-1]) == 0:
+            return last_section_2[-1]
+        elif len(last_section_1) > 0 and isinstance(last_section_1[-1], list) and len(last_section_1[-1]) == 0:
+            return last_section_1
+        else:
+            return None
+    return None
 
 
 if __name__ == '__main__':
     root_path = os.path.abspath(os.path.join(os.getcwd(), "../../.."))
-    file_path = root_path + "/dataset/output_data/ICON.txt"
+    # file_path = root_path + "/dataset/output_data/2312.09251.txt"
+    # file_path = root_path + "/dataset/output_data/ICON.txt"
+    # file_path = root_path + "/dataset/output_data/Self-Alignment.txt"
+    file_path = root_path + "/dataset/output_data/Multimodal-Intelligence.txt"
     save_path = file_path + ".json"
     paper_format_dict = {}
 
@@ -39,29 +189,102 @@ if __name__ == '__main__':
         title = data_split[0]
         paper_content = data_split[1]
         image_explain_text = data_split[2]
-        tabel_explain_text_list = data_split[3]
+        tabel_explain_text = data_split[3]
 
         # 用来存储paper正文的内容，
         # [标题：[正文, [标题：正文]]]
         # 最多两级标题，即主标题+小标题
         paper_content_section_list = []
         paper_content = paper_content.replace(chr(3), "\n")
-        # 分段落
-        paper_content_paragraph = paper_content.replace(f"{chr(2)}{chr(2)}", chr(2)).split(chr(2))
+        # 分段落, 多加一个\n，用于后续分段落用
+        paper_content_paragraph = paper_content.replace(f"{chr(2)}{chr(2)}", f"{chr(2)}")\
+            .replace(f"{chr(2)}", f"{chr(2)}\n{chr(2)}").split(chr(2))
 
         # 抽一下标题的文字大小，选择最大的，且数量大于3的作为一级标题大小，大于这个字体大小的，默认改成这个字体大小，小于这个字体大小的，默认作为小标题
-        # paper_section_font_size = 0
+        paper_section_font_size = get_title_font_size(paper_content)
 
         # 如果paper_content不是abstract开头的，那么加一个默认的标题作为起始标题，名字叫default_section_1
         for index, paragraph in enumerate(paper_content_paragraph):
-            if index == 0 and "abstract" not in paragraph.lower():
-                if not paragraph.startswith(chr(1)) and len(paper_content_section_list) == 0:
-                    paper_content_section_list.append(["default_section_1"])
+            paragraph = paragraph.strip()
+            for line_index, line in enumerate(paragraph.split("\n")):
+                if index == 0 and "abstract" not in line.lower():
+                    if not line.startswith(f"{chr(6)}{chr(1)}") and len(paper_content_section_list) == 0:
+                        paper_content_section_list.append(["default_section_1", paper_section_font_size, []])
 
-            if paragraph.startswith(chr(1)):
-                section_list = paragraph.strip(chr(1)).split(chr(1))
-                section_key = list(paper_content_section_dict.keys())
-                if len(section_key) > 0:
+                # 如果发现这一行是标题，需要把标题合并到之前的标题里面，或者创建一个新的标题
+                if line.startswith(f"{chr(6)}{chr(1)}"):
+                    new_section_info = line.strip(f"{chr(6)}{chr(1)}").split(chr(1))
+                    new_font_size = int(new_section_info[0])
+                    new_section = new_section_info[1].strip()
+
+                    last_section_info = get_paper_content_section_list_last_section(paper_content_section_list)
+                    # 如果最后一个标题信息符合将下一个标题合并进去，那么就考虑将新的标题合并到老的标题里面
+                    if last_section_info:
+                        old_section = last_section_info[0]
+                        old_font_size = last_section_info[1]
+                        old_content_list = last_section_info[2]
+
+                        # 因为新标题的字体大小与老标题不一致，那说明新的标题不能合并
+                        if (new_font_size != old_font_size) or ("abstract" in old_section.lower()):
+                            set_paper_content_section_list_last_key(paper_content_section_list, None, new_section,
+                                                                    new_font_size)
+                        # 将新的标题作为一个新的list插入到paper_content_section_list中
+                        else:
+                            new_section = f"{old_section} {new_section}"
+                            set_paper_content_section_list_last_key(paper_content_section_list, old_section, new_section, new_font_size)
+                    # 不符合插入新的标题的要求，那么就创建一个新的标题list放进去
+                    else:
+                        set_paper_content_section_list_last_key(paper_content_section_list, None, new_section, new_font_size)
+                # 如果不是标题，那么就是正文内容，那么将正文内容插入到[section, font_size, []]中的最后一个内容位置
+                else:
+                    line = line.strip()
+                    insert_paper_content_section_list_content(paper_content_section_list, line)
+
+        # 将行拼接成段落
+        # 如果上一行不是句号结尾，那么就把下一行和上一行进行拼接，用空格分割；如果上一行结尾是-，那么就不用空格拼接，去掉-，直接拼接
+        # 如果上一行是句号，那么就要看下一行是不是空字符串，如果是，那么可以作为段落的分隔符
+        # 如果上一行不是句号，但是下一行是空字符串，那么直接跳过空字符串，继续找下一行的非空字符串
+        combine_paper_content_section_list = []
+        for paper_content_section in paper_content_section_list:
+            new_content_list = []
+            first_str_flag = "line"
+            for line in paper_content_section[-1]:
+                if isinstance(line, str) and first_str_flag == "line":
+                    first_str_flag = "line_ing"
+                    new_content_list.extend(combine_line_to_paragraph(paper_content_section))
+                elif isinstance(line, list):
+                    first_str_flag = "list"
+                    new_content_list.append([line[0], line[1],
+                                             combine_line_to_paragraph(line)])
+                else:
+                    if first_str_flag == "list":
+                        raise Exception("合并line到paragraph的时候出现错误")
+            paper_content_section[-1] = new_content_list
+            combine_paper_content_section_list.append(paper_content_section)
+
+        # 处理一下图片或者表格的说明文本
+        image_explain_list = []
+        for image_explain_info in image_explain_text.split(chr(4)):
+            image_explain = []
+            for info in image_explain_info.split("\n"):
+                if len(info) > 0 and info[-1] == '-':
+                    info = info[:-1] + f"{chr(1)} "
+                image_explain.append(info)
+            image_explain_list.append(" ".join(image_explain).replace(f"{chr(1)} ", ""))
+
+        table_explain_list = []
+        for table_explain_info in tabel_explain_text.split(chr(4)):
+            table_explain = []
+            for info in table_explain_info.split("\n"):
+                if len(info) > 0 and info[-1] == '-':
+                    info = info[:-1] + f"{chr(1)} "
+                table_explain.append(info)
+            table_explain_list.append(" ".join(table_explain).replace(f"{chr(1)} ", ""))
+
+
+
+
+
 
 
 
@@ -70,6 +293,11 @@ if __name__ == '__main__':
 
 
         paper_format_dict["title"] = title
-
+        paper_format_dict["content"] = paper_content_section_list
+        paper_format_dict["image_explain"] = image_explain_list
+        paper_format_dict["table_explain"] = table_explain_list
+        paper_format_json = json.dumps(paper_format_dict, ensure_ascii=False)
+        with open(save_path, "w", encoding="utf-8") as f_write:
+            f_write.write(paper_format_json)
 
         a = 1
