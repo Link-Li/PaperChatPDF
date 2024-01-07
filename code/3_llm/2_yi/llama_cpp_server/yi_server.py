@@ -33,8 +33,7 @@ app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 worker_id = 0
-batch_size = 1
-max_length = 2048
+max_length = 4096
 gpu_index, worker_id = set_process_gpu()
 torch.set_num_threads(8)
 
@@ -43,7 +42,7 @@ class ModelChat:
     def __init__(self,):
         # 模型加载
         model_file = "/data/zhenli/model_file/yi/01-ai--Yi-34B-Chat/ggml-model-q4_0.gguf"
-        self.llm = Llama(model_path=model_file, verbose=True, n_ctx=4096, n_threads=16, n_gpu_layers=40)
+        self.llm = Llama(model_path=model_file, verbose=True, n_ctx=max_length, n_batch=1024, n_threads=16, n_gpu_layers=30)
         model_path = '/data/zhenli/model_file/yi/01-ai--Yi-34B-Chat'
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
 
@@ -71,6 +70,8 @@ def get_model_chat():
 @app.route('/', methods=["GET"])
 def test():
     return "hello world"
+
+print("init finish")
 
 # if __name__ == '__main__':
 #     app.run(host='9.134.253.154', port=9020)

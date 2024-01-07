@@ -277,6 +277,9 @@ with fitz.open(file_path) as doc:  # open document
                                         text += chr(2)
                             if paper_content_flag == 1:
                                 span_text.append(text)
+                    # 这里主要是将一些根据结尾识别为段落分割位置的替换掉，
+                    # 因为部分结尾识别的并不准确，可能只是一行话，被解析成了两行话，导致识别错误
+                    # 这里可能也会因为没有识别到段落开头，导致段落分割位置被替换掉，但是这里对段落的识别没有要求那么严格，可以一定程度上忍受段落分割的不那么准确
                     span_text = " ".join(span_text).strip().replace(f"{chr(2)} ", " ")
                     if len(span_text) > 0 \
                             and not span_text.isdigit()\
