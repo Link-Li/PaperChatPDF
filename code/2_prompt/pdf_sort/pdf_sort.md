@@ -277,3 +277,97 @@ Diffusion Decoder
 Visual EncoderFigure 1. Overview of our proposed approach. The upper part delineates the image tokenizer-detokenizer framework, designed for encoding images into continuous visual embeddings and reconstructing them in the pixel space. The lower part demonstrates the implementation of our VL-GPT, where interleaved image-text data are encoded into multimodal sequence using image and text tokenizers, subsequently processed by a transformer model auto-regressively. The image and text detokenizers are employed for generating respective outputs.
 
 arXiv:2312.09251v1 [cs.CV] 14 Dec 2023
+
+
+
+
+
+
+
+
+
+
+## 文档翻译
+
+```
+请将下述英文学术文本翻译成高质量的中文版本。翻译应确保学术精确度和专业性，并遵循学术论文的写作规范与风格。预期的翻译将用于论文发表，因此请确保语言的正式性、准确性和连贯性。
+英文学术文本"""
+In this work, we introduce Vision-Language Generative Pre-trained Transformer (VL-GPT), a transformer model proficient at concurrently perceiving and generating visual and linguistic data. VL-GPT achieves a unified pre-training approach for both image and text modalities by employing a straightforward auto-regressive objective, thereby enabling the model to process image and text as seamlessly as a language model processes text. To accomplish this, we initially propose a novel image tokenizer-detokenizer framework for visual data, specifically designed to transform raw images into a sequence of continuous embeddings and reconstruct them accordingly. In combination with the existing text tokenizer and detokenizer, this framework allows for the encoding of interleaved image-text data into a multimodal sequence, which can subsequently be fed into the transformer model. Consequently, VL-GPT can perform largescale pre-training on multimodal corpora utilizing a unified auto-regressive objective ( i.e ., next-token prediction). Upon completion of pre-training, VL-GPT exhibits remarkable zero-shot and few-shot performance across a diverse range of vision and language understanding and generation tasks, including image captioning, visual question answering, text-to-image generation, and more. Additionally, the pre-trained model retrains in-context learning capabilities when provided with multimodal prompts. We further conduct instruction tuning on our VL-GPT, highlighting its exceptional potential for multimodal assistance.
+"""
+```
+
+
+
+## 文档摘要总结prompt
+```
+你是一位计算机科学研究者，负责撰写一篇关于下述论文的总结。请仔细阅读提供的论文介绍，从中提炼以下要点：
+
+1. 论文的主题和研究范畴；
+2. 论文是否提到了之前的研究结果，如果提到进行总结；
+3. 论文的创新之处，即它引入的新概念、方法或技术；
+4. 论文所解决的关键问题或挑战；
+5. 论文提出的解决方案或方法；
+6. 该解决方案的效果评估，包括实验结果、性能比较等。
+
+请确保总结内容清晰、凝练，并能够精确反映论文的核心贡献和成果。
+
+论文介绍"""
+Driven by the remarkable success of large language models (LLMs) in the field of natural language processing (NLP) , there has been a surge of interest within multimodal community to develop large vision-language (VL) models. One of the promising approaches, exemplified by Flamingo , BLIP2 , LLAVA , have explored how to build large VL models based on powerful pre-trained LLMs. These studies typically adopted a similar architecture: a pre-trained image encoder and an LLM are connected via a trainable connection module, which aligns the image feature and text embeddings, thereby enabling language models to accept images and text as inputs and generate a text sequence.
+To expand the capabilities of generating image in a multimodal context, certain efforts, e.g ., Visual ChatGPT , attempt to connect LLMs with image generation tools in a cascaded pipeline by transferring text messages, which inevitably introduce instability and noise. Alternatively, another line of research achieves it by optimizing models in an end-to-end manner . By aligning the output space with the image diffusion models, VL models can not only perceive but also generate images and text.
+A crucial characteristic of large language models is autoregressive modeling , i.e ., predicting next token, which facilitates language understanding and generation in a unified manner. However, in the aforementioned studies, the inconsistency of image embeddings between LLM’s input and output sides compels the model to treat input images and generated images differently, resulting in separate modeling for image understanding and generation. Meanwhile, this discrepancy also obstructs the implementation of autoregressive training loss on image embeddings.
+In this study, we introduce VL-GPT, a large visionlanguage generative pre-trained transformer that enables the unified training of both visual and linguistic data using an auto-regressive objective, as depicted in Fig. 1 . To achieve this, we propose an image tokenizer-detokenizer framework for the conversion between raw image pixels and continuous visual embeddings, analogous to the role of the text tokenization  in language models. The framework comprises an image tokenizer and an image detokenizer, where the tokenizer encodes raw images into a sequence of continuous visual embeddings, and the detokenizer decodes the continuous embeddings into pixel space. To obtain visual continuous embeddings that are rich in both image details and semantic information, we employ the image embeddings and their corresponding caption embeddings extracted by pre-trained encoders ( i.e ., CLIP ) as the supervision for training of the framework. Furthermore, the efficiency of the framework training is enhanced through weight initialization from pre-trained image encoders and high-quality image diffusion models.
+By employing the image tokenizer-detokenizer framework, visual embeddings can achieve consistency on both the input and output sides of the transformer model. Consequently, interleaved image-text data can be trained in a unified auto-regressive manner. Specifically, the image tokenizer and the existing text tokenizer ( i.e ., BPE tokenizer ) first convert the image and text into a multimodal sequence consisting of interleaved continuous visual embeddings and discrete text tokens. The transformer can then be trained to predict the next embedding or token in this multimodal sequence, employing mean squared error (MSE) loss for continuous visual embeddings and crossentropy loss for discrete text tokens. Contrary to previous works , all embeddings in the multimodal sequence can receive supervision from the auto-regressive loss. During the generation stage, visual embeddings and text tokens can be generated auto-regressively without distinction, and subsequently decoded into raw images and text by the image detokenizer and text detokenizer, respectively.
+Owing to the unified modeling, the pre-training of the VL model can be conducted on large-scale image-text pairs and interleaved image-text data. Upon completion of pretraining, the model is capable of perceiving arbitrary multimodal input and generating responses varying in modalities ( e.g ., text, images or their interleaved contents), allowing it to generalize to a wide range of vision and language understanding and generation tasks in a zero-shot or few-shot manner. Moreover, the pre-trained model exhibits appealing emergent properties for multimodal in-context learning, as it can effectively tackle new unseen tasks when provided with multimodal prompts. The VL generative pre-trained transformer model, referred to as VL-GPT, holds the potential to serve as a powerful foundation model for the multimodal community, similar to the role of GPT family  in NLP. Our contributions are summarized as follows: • We propose an image tokenizer-detokenizer framework to convert images into continuous embeddings and reconstruct them, while exploring effective training methods for this framework.",
+Through efficient training that requires an affordable computational cost, the image tokenizer and detokenizer can effectively retain both semantic information and pixel details of the original image.
+• We introduce VL-GPT, a generative pre-trained transformer model for vision and language (VL) understanding and generation tasks. The model can be pre-trained on large-scale multimodal corpora in a unified autoregressive manner, i.e ., predicting the next token in a multimodal sequence containing continuous visual embeddings and discrete text tokens without any discrimination. • VL-GPT exhibits competitive performance on various VL understanding and generation benchmarks under zeroshot and few-shot settings, including image captioning, visual question answering, and text-to-image generation.",
+"It also demonstrates an appealing multimodal in-context learning ability when provided with multimodal prompts.
+Furthermore, it shows promising potential to serve as a general multimodal assistant through instruction tuning.
+"""
+
+总结：
+按照上述要点撰写总结如下：
+1. 论文的主题和研究范畴：
+2. 论文是否提到了之前的研究结果，如果提到进行总结：
+3. 论文的创新之处，即它引入的新概念、方法或技术：
+4. 论文所解决的关键问题或挑战：
+5. 论文提出的解决方案或方法：
+6. 该解决方案的效果评估，包括实验结果、性能比较等：
+
+```
+
+
+```
+You are a computer science researcher responsible for writing a summary of the paper outlined below. Please read the provided paper introduction carefully and distill the following key points:
+
+1. The theme and research scope of the paper;
+2. Whether the paper references previous studies, and if so, provide a summary;
+3. The innovative aspects of the paper, namely the new concepts, methods, or technologies introduced;
+4. The key problems or challenges addressed by the paper;
+5. The solutions or methods proposed by the paper;
+6. The assessment of the effectiveness of the solution, including experimental results, performance comparisons, etc.
+
+Ensure that the summary is clear, concise, and accurately reflects the core contributions and outcomes of the paper.
+
+Paper Introduction"""
+Driven by the remarkable success of large language models (LLMs) in the field of natural language processing (NLP) , there has been a surge of interest within multimodal community to develop large vision-language (VL) models. One of the promising approaches, exemplified by Flamingo , BLIP2 , LLAVA , have explored how to build large VL models based on powerful pre-trained LLMs. These studies typically adopted a similar architecture: a pre-trained image encoder and an LLM are connected via a trainable connection module, which aligns the image feature and text embeddings, thereby enabling language models to accept images and text as inputs and generate a text sequence.
+To expand the capabilities of generating image in a multimodal context, certain efforts, e.g ., Visual ChatGPT , attempt to connect LLMs with image generation tools in a cascaded pipeline by transferring text messages, which inevitably introduce instability and noise. Alternatively, another line of research achieves it by optimizing models in an end-to-end manner . By aligning the output space with the image diffusion models, VL models can not only perceive but also generate images and text.
+A crucial characteristic of large language models is autoregressive modeling , i.e ., predicting next token, which facilitates language understanding and generation in a unified manner. However, in the aforementioned studies, the inconsistency of image embeddings between LLM’s input and output sides compels the model to treat input images and generated images differently, resulting in separate modeling for image understanding and generation. Meanwhile, this discrepancy also obstructs the implementation of autoregressive training loss on image embeddings.
+In this study, we introduce VL-GPT, a large visionlanguage generative pre-trained transformer that enables the unified training of both visual and linguistic data using an auto-regressive objective, as depicted in Fig. 1 . To achieve this, we propose an image tokenizer-detokenizer framework for the conversion between raw image pixels and continuous visual embeddings, analogous to the role of the text tokenization  in language models. The framework comprises an image tokenizer and an image detokenizer, where the tokenizer encodes raw images into a sequence of continuous visual embeddings, and the detokenizer decodes the continuous embeddings into pixel space. To obtain visual continuous embeddings that are rich in both image details and semantic information, we employ the image embeddings and their corresponding caption embeddings extracted by pre-trained encoders ( i.e ., CLIP ) as the supervision for training of the framework. Furthermore, the efficiency of the framework training is enhanced through weight initialization from pre-trained image encoders and high-quality image diffusion models.
+By employing the image tokenizer-detokenizer framework, visual embeddings can achieve consistency on both the input and output sides of the transformer model. Consequently, interleaved image-text data can be trained in a unified auto-regressive manner. Specifically, the image tokenizer and the existing text tokenizer ( i.e ., BPE tokenizer ) first convert the image and text into a multimodal sequence consisting of interleaved continuous visual embeddings and discrete text tokens. The transformer can then be trained to predict the next embedding or token in this multimodal sequence, employing mean squared error (MSE) loss for continuous visual embeddings and crossentropy loss for discrete text tokens. Contrary to previous works , all embeddings in the multimodal sequence can receive supervision from the auto-regressive loss. During the generation stage, visual embeddings and text tokens can be generated auto-regressively without distinction, and subsequently decoded into raw images and text by the image detokenizer and text detokenizer, respectively.
+Owing to the unified modeling, the pre-training of the VL model can be conducted on large-scale image-text pairs and interleaved image-text data. Upon completion of pretraining, the model is capable of perceiving arbitrary multimodal input and generating responses varying in modalities ( e.g ., text, images or their interleaved contents), allowing it to generalize to a wide range of vision and language understanding and generation tasks in a zero-shot or few-shot manner. Moreover, the pre-trained model exhibits appealing emergent properties for multimodal in-context learning, as it can effectively tackle new unseen tasks when provided with multimodal prompts. The VL generative pre-trained transformer model, referred to as VL-GPT, holds the potential to serve as a powerful foundation model for the multimodal community, similar to the role of GPT family  in NLP. Our contributions are summarized as follows: • We propose an image tokenizer-detokenizer framework to convert images into continuous embeddings and reconstruct them, while exploring effective training methods for this framework.",
+Through efficient training that requires an affordable computational cost, the image tokenizer and detokenizer can effectively retain both semantic information and pixel details of the original image.
+• We introduce VL-GPT, a generative pre-trained transformer model for vision and language (VL) understanding and generation tasks. The model can be pre-trained on large-scale multimodal corpora in a unified autoregressive manner, i.e ., predicting the next token in a multimodal sequence containing continuous visual embeddings and discrete text tokens without any discrimination. • VL-GPT exhibits competitive performance on various VL understanding and generation benchmarks under zeroshot and few-shot settings, including image captioning, visual question answering, and text-to-image generation.",
+"It also demonstrates an appealing multimodal in-context learning ability when provided with multimodal prompts.
+Furthermore, it shows promising potential to serve as a general multimodal assistant through instruction tuning.
+"""
+
+Summary:
+The summary is crafted according to the points above as follows:
+1. The theme and research scope of the paper:
+2. Whether the paper references previous studies, and if so, provide a summary:
+3. The innovative aspects of the paper, namely the new concepts, methods, or technologies introduced:
+4. The key problems or challenges addressed by the paper:
+5. The solutions or methods proposed by the paper:
+6. The assessment of the effectiveness of the solution, including experimental results, performance comparisons, etc:
+
+```

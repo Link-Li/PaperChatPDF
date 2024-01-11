@@ -51,12 +51,26 @@ while True:
 prompt = f'''基于下面的摘要，请识别并列出3个专业术语作为关键词，使得这些关键词能有效用于学术搜索引擎中，来查找相关领域的研究论文。关键词应该具体、相关，并且是此研究领域内通用的术语。
 
 摘要："""
-In this work, we introduce Vision-Language Generative Pre-trained Transformer (VL-GPT), a transformer model proficient at concurrently perceiving and generating visual and linguistic data. VL-GPT achieves a unified pre-training approach for both image and text modalities by employing a straightforward auto-regressive objective, thereby enabling the model to process image and text as seamlessly as a language model processes text. To accomplish this, we initially propose a novel image tokenizer-detokenizer framework for visual data, specifically designed to transform raw images into a sequence of continuous embeddings and reconstruct them accordingly. In combination with the existing text tokenizer and detokenizer, this framework allows for the encoding of interleaved image-text data into a multimodal sequence, which can subsequently be fed into the transformer model. Consequently, VL-GPT can perform largescale pre-training on multimodal corpora utilizing a unified auto-regressive objective ( i.e ., next-token prediction). Upon completion of pre-training, VL-GPT exhibits remarkable zero-shot and few-shot performance across a diverse range of vision and language understanding and generation tasks, including image captioning, visual question answering, text-to-image generation, and more. Additionally, the pre-trained model retrains in-context learning capabilities when provided with multimodal prompts. We further conduct instruction tuning on our VL-GPT, highlighting its exceptional potential for multimodal assistance.
+We present a scalable method to build a high quality instruction following language model by automatically labelling human-written text with corresponding instructions. Our approach, named instruction backtranslation , starts with a language model finetuned on a small amount of seed data, and a given web corpus. The seed model is used to construct training examples by generating instruction prompts for web documents ( self-augmentation ), and then selecting high quality examples from among these candidates ( self-curation ). This data is then used to finetune a stronger model. Finetuning LLaMa on two iterations of our approach yields a model that outperforms all other LLaMa-based models on the Alpaca leaderboard not relying on distillation data, demonstrating highly effective self-alignment.
 """
 
 注意：关键词应捕捉摘要中最重要和最具代表性的概念，同时关键词不一定是摘要中的原文。
 
 关键词生成：
+1.
+2.
+3.
+'''
+
+prompt = f'''Based on the abstract provided, please extract 3 concisely formulated keywords, each no longer than three words, that encapsulate the core technologies or concepts presented. These keywords should not only be central to this specific research but also have the potential to be leveraged effectively in academic search engines to locate related studies. It is important that these terms are commonly recognized and utilized within this area of expertise.
+
+Abstract: """
+We present a scalable method to build a high quality instruction following language model by automatically labelling human-written text with corresponding instructions. Our approach, named instruction backtranslation , starts with a language model finetuned on a small amount of seed data, and a given web corpus. The seed model is used to construct training examples by generating instruction prompts for web documents ( self-augmentation ), and then selecting high quality examples from among these candidates ( self-curation ). This data is then used to finetune a stronger model. Finetuning LLaMa on two iterations of our approach yields a model that outperforms all other LLaMa-based models on the Alpaca leaderboard not relying on distillation data, demonstrating highly effective self-alignment.
+"""
+
+Please ensure that the selected keywords are technically robust and focus on representing the most critical aspects of the abstract. The chosen terms may be synthesized from the abstract content and should not necessarily be limited to exact phrases from the text.
+
+Suggested Keywords:
 1.
 2.
 3.
