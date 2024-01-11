@@ -287,6 +287,51 @@ arXiv:2312.09251v1 [cs.CV] 14 Dec 2023
 
 
 
+## 文档关键词提取
+```
+根据提供的摘要内容，鉴定并选择3个专业关键词。这些关键词需要满足以下条件：
+
+1.具体性：它们应精确反映研究的核心主题和方法。
+2.相关性：它们必须和摘要内容紧密相关，适用于指代该研究的重点方面。
+3.专业性：它们应是该研究领域内广泛认可和使用的术语。
+4.它们将被用来在学术搜索引擎中检索相似领域的研究论文。请确保所选关键词可以有效地指导研究人员或学者找到与此摘要相似的研究工作。
+5.请勿直接选取摘要中的词汇，除非认为它们是不可替代且直接表明研究特定领域的关键术语。关键词的选取应该体现出理解和分析摘要内容的能力。
+
+
+摘要："""
+We present a scalable method to build a high quality instruction following language model by automatically labelling human-written text with corresponding instructions. Our approach, named instruction backtranslation , starts with a language model finetuned on a small amount of seed data, and a given web corpus. The seed model is used to construct training examples by generating instruction prompts for web documents ( self-augmentation ), and then selecting high quality examples from among these candidates ( self-curation ). This data is then used to finetune a stronger model. Finetuning LLaMa on two iterations of our approach yields a model that outperforms all other LLaMa-based models on the Alpaca leaderboard not relying on distillation data, demonstrating highly effective self-alignment.
+"""
+
+请在下方列出您选定的关键词：
+1. 
+2. 
+3. 
+
+```
+
+```
+Based on the provided abstract, identify and select 3 professional keywords. These keywords should meet the following criteria:
+
+1. Specificity: They should precisely reflect the core themes and methods of the research.
+2. Relevance: They must be closely related to the content of the abstract and suitable for referring to the key aspects of the study.
+3. Professionalism: They should be terms that are widely recognized and utilized within the research field.
+4. They will be used to retrieve research papers in similar fields through academic search engines. Ensure that the chosen keywords can effectively guide researchers or scholars in finding research works akin to this abstract.
+5. Do not directly select vocabulary from the abstract unless you believe they are irreplaceable and directly indicate the specific fields of research. The choice of keywords should demonstrate the ability to comprehend and analyze the contents of the abstract.
+
+Abstract: """
+We present a scalable method to build a high quality instruction following language model by automatically labelling human-written text with corresponding instructions. Our approach, named instruction backtranslation , starts with a language model finetuned on a small amount of seed data, and a given web corpus. The seed model is used to construct training examples by generating instruction prompts for web documents ( self-augmentation ), and then selecting high quality examples from among these candidates ( self-curation ). This data is then used to finetune a stronger model. Finetuning LLaMa on two iterations of our approach yields a model that outperforms all other LLaMa-based models on the Alpaca leaderboard not relying on distillation data, demonstrating highly effective self-alignment.
+"""
+
+Please list your selected keywords below:
+1.
+2.
+3.
+```
+
+
+
+
+
 ## 文档翻译
 
 ```
