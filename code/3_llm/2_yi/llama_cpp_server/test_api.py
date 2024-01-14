@@ -3,7 +3,17 @@
 @Time        : 2024/1/6 21:45
 @Author      : noahzhenli
 @Email       : 
-@Description : 
+@Description :
+
+
+<|im_start|>user\n你是谁？<|im_end|>\n<|im_start|>assistant
+
+ temperature=0.6, top_p=0.8, repeat_penalty=1.1
+
+./main -m /home/lizhen/test/model_file/01-yi/01-yi-6b-chat/ggml-model-q4_0.gguf -n 256 --repeat_penalty 1.0 --temp 0.6 --top-p 0.8 -ngl 20 --in-prefix '<|im_start|>' -r '<|im_end|>' -p '<|im_start|>user\n你是谁？<|im_end|>\n<|im_start|>assistant'
+./server -m /home/lizhen/test/model_file/01-yi/01-yi-6b-chat/ggml-model-q4_0.gguf -n 50 -ngl 20
+
+
 """
 
 import requests
@@ -12,7 +22,7 @@ def api(message_list):
     headers = {"Content-Type": "application/json"}
     data_json = {}
     data_json["message_list"] = message_list
-    ip_url = "http://127.0.0.1:8000/model_chat"
+    ip_url = "http://192.168.31.137:9020/model_chat"
     respone = requests.post(url=ip_url, json=data_json, headers=headers)
     return respone.json()
 
@@ -24,9 +34,9 @@ message_list = [
     {"role": "user", "content": "我上句话说了啥？"},
 ]
 
-# message_list = [
-#     {"role": "user", "content": "你是谁？"}
-# ]
+message_list = [
+    {"role": "user", "content": "你是谁？"}
+]
 
 prompt = f'''请将下述英文学术文本翻译成高质量的中文版本。翻译应确保学术精确度和专业性，并遵循学术论文的写作规范与风格。预期的翻译将用于论文发表，因此请确保语言的正式性、准确性和连贯性。
 英文学术文本"""
@@ -102,3 +112,48 @@ res = api(message_list)
 print(res["response"])
 print(res["response"]["choices"][0]["text"])
 
+
+
+
+
+
+
+
+
+# llama cpp server test
+# 20层
+
+import requests
+
+prompt = f'''Based on the provided abstract, identify and select 3 professional keywords. These keywords should meet the following criteria:
+
+1. Specificity: They should precisely reflect the core themes and methods of the research.
+2. Relevance: They must be closely related to the content of the abstract and suitable for referring to the key aspects of the study.
+3. Professionalism: They should be terms that are widely recognized and utilized within the research field.
+4. They will be used to retrieve research papers in similar fields through academic search engines. Ensure that the chosen keywords can effectively guide researchers or scholars in finding research works akin to this abstract.
+5. Do not directly select vocabulary from the abstract unless you believe they are irreplaceable and directly indicate the specific fields of research. The choice of keywords should demonstrate the ability to comprehend and analyze the contents of the abstract.
+
+Abstract: """
+We present a scalable method to build a high quality instruction following language model by automatically labelling human-written text with corresponding instructions. Our approach, named instruction backtranslation , starts with a language model finetuned on a small amount of seed data, and a given web corpus. The seed model is used to construct training examples by generating instruction prompts for web documents ( self-augmentation ), and then selecting high quality examples from among these candidates ( self-curation ). This data is then used to finetune a stronger model. Finetuning LLaMa on two iterations of our approach yields a model that outperforms all other LLaMa-based models on the Alpaca leaderboard not relying on distillation data, demonstrating highly effective self-alignment.
+"""
+
+Please list your selected keywords below:
+1.
+2.
+3.
+'''
+
+headers = {"Content-Type": "application/json"}
+data_json = {
+    "prompt": f"<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant",
+    "temperature": 0.6,
+    "top_p": 0.8,
+    "repeat_penalty": 1.1,
+    "stop": ["<|im_end|>"]
+}
+ip_url = "http://localhost:8080/completion"
+respone = requests.post(url=ip_url, json=data_json, headers=headers)
+for key, value in respone.json().items():
+    print(key, ": ", value)
+print(respone.json())
+print(respone.text)

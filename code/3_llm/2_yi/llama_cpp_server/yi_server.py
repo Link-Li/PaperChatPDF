@@ -13,10 +13,7 @@ gunicorn -c gunicorn_conf.py yi_server:app
 import os
 
 # 如果机器没有安装cuda，pytorch安装了cuda-toolkit，要在import onnxruntime之前先import torch
-import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-from transformers.generation.utils import GenerationConfig
-from peft import prepare_model_for_kbit_training
 from flask import Flask, request
 from llama_cpp import Llama
 
@@ -35,7 +32,6 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 worker_id = 0
 max_length = 4096
 gpu_index, worker_id = set_process_gpu()
-torch.set_num_threads(8)
 
 
 class ModelChat:
