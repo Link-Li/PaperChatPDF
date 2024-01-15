@@ -319,6 +319,7 @@ Based on the provided abstract, identify and select 3 professional keywords. The
 5. Do not directly select vocabulary from the abstract unless you believe they are irreplaceable and directly indicate the specific fields of research. The choice of keywords should demonstrate the ability to comprehend and analyze the contents of the abstract.
 
 Abstract: """
+Self-Alignment with Instruction Backtranslation.
 We present a scalable method to build a high quality instruction following language model by automatically labelling human-written text with corresponding instructions. Our approach, named instruction backtranslation , starts with a language model finetuned on a small amount of seed data, and a given web corpus. The seed model is used to construct training examples by generating instruction prompts for web documents ( self-augmentation ), and then selecting high quality examples from among these candidates ( self-curation ). This data is then used to finetune a stronger model. Finetuning LLaMa on two iterations of our approach yields a model that outperforms all other LLaMa-based models on the Alpaca leaderboard not relying on distillation data, demonstrating highly effective self-alignment.
 """
 
