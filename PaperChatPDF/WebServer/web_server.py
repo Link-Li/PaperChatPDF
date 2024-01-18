@@ -8,18 +8,21 @@
 import json
 from datetime import datetime
 from pathlib import Path
+import uuid
 
 from flask import app, request, Flask, send_file, make_response
 from werkzeug.utils import secure_filename
 
+from create_flask_app import create_app, db
 from web_server_config import TestingConfig
 from PDFParse.pdf_to_json import parse_pdf_to_txt, parse_pdf_text_to_json
+from MySQL.table_class import PdfInfo
 
 
+app = create_app()
 
-app = Flask(__name__)
-app.config.from_object(TestingConfig())
-
+with app.app_context():
+    db.create_all()
 
 def check_file_type(filename, type):
     if '.' in filename and filename.split('.')[-1] == type:
@@ -67,10 +70,9 @@ def parse_pdf_to_json():
         return response_msg
 
     if file and check_file_type(file.filename, "pdf"):
-        # 保存到mysql里面，并获取文件id
-        # date_time = datetime.today().strftime("%Y%m%d%H")
-        date_time = "2024010723"
-        file_id = "123"
+        date_time = datetime.today().strftime("%Y%m%d%H")
+        # date_time = "2024010723"
+        file_id = str(uuid.uuid1())
         exist_flag = True  # 后续替换成mysql里面的查询结果
         if exist_flag and write_mode != "overwrite":
             response_msg["msg_code"] = 3
@@ -78,31 +80,50 @@ def parse_pdf_to_json():
 
         # 保存文件
         save_filename = secure_filename(file.filename)
-        save_dir = app.config["PDF_SAVE_PATH"] / date_time / f"{file_id}"
+        save_dir = app.config["PDF_SAVE_PATH"] / date_time
         Path.mkdir(save_dir, parents=True, exist_ok=True)
-        pdf_save_path = save_dir / f"{save_filename}"
+        pdf_save_path = save_dir / f"{file_id}-{save_filename}"
         file.save(pdf_save_path)
 
         # 将PDF文件解析成txt
         try:
-            save_dir = app.config["PDF_TXT_SAVE_PATH"] / date_time / f"{file_id}"
+            save_dir = app.config["PDF_TXT_SAVE_PATH"] / date_time
             Path.mkdir(save_dir, parents=True, exist_ok=True)
-            pdf_txt_save_path = save_dir / f"{save_filename}.txt"
+            pdf_txt_save_path = save_dir / f"{file_id}-{save_filename}.txt"
             parse_pdf_to_txt(pdf_save_path, pdf_txt_save_path)
         except Exception as e:
             response_msg["msg_code"] = 4
             response_msg["msg_content"] = f"parse pdf to txt error: {e}"
             return response_msg
 
-        # 将PDF文件解析成txt
+        # 将PDF文件解析成json
         try:
-            save_dir = app.config["PDF_JSON_SAVE_PATH"] / date_time / f"{file_id}"
+            save_dir = app.config["PDF_JSON_SAVE_PATH"] / date_time
             Path.mkdir(save_dir, parents=True, exist_ok=True)
-            pdf_json_save_path = save_dir / f"{save_filename}.json"
-            parse_pdf_text_to_json(pdf_txt_save_path, pdf_json_save_path)
+            pdf_json_save_path = save_dir / f"{file_id}-{save_filename}.json"
+            pdf_json = parse_pdf_text_to_json(pdf_txt_save_path, pdf_json_save_path)
         except Exception as e:
             response_msg["msg_code"] = 5
             response_msg["msg_content"] = f"parse pdf txt to json error: {e}"
+            return response_msg
+
+        # 将解析之后的结果存入到数据库中
+        try:
+            title = request_json.get("title", None)
+            abstract = request_json.get("abstract", None)
+            if title is None:
+                title = pdf_json["title"]
+            if abstract is None:
+                if pdf_json["content"][0][0].lower() == 'abstract':
+                    abstract = pdf_json["content"][0][2][0]
+                else:
+                    abstract = ""
+            pdf_info = PdfInfo(title=title, abstract=abstract, pdf_save_path=pdf_save_path, json_save_path=pdf_json_save_path)
+            db.session.add(pdf_info)
+            db.session.commit()
+        except Exception as e:
+            response_msg["msg_code"] = 6
+            response_msg["msg_content"] = f"save pdf info to mysql error: {e}"
             return response_msg
 
     return response_msg
@@ -121,21 +142,17 @@ def get_pdf_json():
     """
     response_msg = {"msg_code": 0, "msg_content": "success"}
     request_json = request.form.to_dict()
-    file_id = request_json["data_id"]
-    file_name = request_json["file_name"]
+    pdf_id = request_json["pdf_id"]
     # 查数据库看文件是否存在，并获取文件的保存位置
-    file_exist_flag = True
-
-    # 后期换成正常mysql的路径
-    date_time = "2024010723"
-    file_path = app.config["PDF_JSON_SAVE_PATH"] / date_time / f"{file_id}/{file_name}"
-
-    if not file_exist_flag:
+    pdf_info = PdfInfo.query.filter_by(id=int(pdf_id)).first()
+    if pdf_info:
+        file_path = pdf_info.json_save_path
+    else:
         response_msg["msg_code"] = 1
-        response_msg["msg_content"] = f"{file_id}-{file_name} file not found"
+        response_msg["msg_content"] = f"id: {pdf_id}, file not found"
         response = make_response("file not found", 200)
         response.headers['msg_code'] = json.dumps(response_msg)
-        return response_msg
+        return response
 
     response = make_response(send_file(file_path, as_attachment=True))
     response.headers['msg_code'] = json.dumps(response_msg)

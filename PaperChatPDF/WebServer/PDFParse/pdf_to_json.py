@@ -631,4 +631,5 @@ def parse_pdf_text_to_json(file_path, save_path):
         paper_format_json = json.dumps(paper_format_dict, ensure_ascii=False)
         with open(save_path, "w", encoding="utf-8") as f_write:
             f_write.write(paper_format_json)
+    return paper_format_dict
 
