@@ -522,6 +522,7 @@ def parse_pdf_text_to_json(file_path, save_path):
         save_path:
 
     Returns:
+        paper_format_dict (dict): 解析之后的PDF的数据
 
     """
     paper_format_dict = {}

@@ -6,9 +6,11 @@
 @Description : 
 """
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 import uuid
+import requests
 
 from flask import app, request, Flask, send_file, make_response
 from werkzeug.utils import secure_filename
@@ -17,6 +19,7 @@ from create_flask_app import create_app, db
 from web_server_config import TestingConfig
 from PDFParse.pdf_to_json import parse_pdf_to_txt, parse_pdf_text_to_json
 from MySQL.table_class import PdfInfo
+import default_prompts
 
 
 app = create_app()
@@ -51,10 +54,8 @@ def parse_pdf_to_json():
     同时将PDF解析成json文件进行保存
 
     Returns:
-        response_msg (str):
-            返回处理之后的结果。
-            "msg_code": 0:正常；其他表示出现错误，错误信息见msg_content。
-            "msg_content": 错误信息。
+        msg_code (int): 0表示正常，其他错误，见msg_content
+        msg_content (str): 错误信息
     """
     response_msg = {"msg_code": 0, "msg_content": "success"}
     file = request.files.get("file", None)
@@ -141,7 +142,7 @@ def get_pdf_json():
 
     """
     response_msg = {"msg_code": 0, "msg_content": "success"}
-    request_json = request.form.to_dict()
+    request_json = request.get_json()
     pdf_id = request_json["pdf_id"]
     # 查数据库看文件是否存在，并获取文件的保存位置
     pdf_info = PdfInfo.query.filter_by(id=int(pdf_id)).first()
@@ -159,6 +160,189 @@ def get_pdf_json():
     return response
 
 
+# 对论文的摘要进行关键词提取
+@app.route("/pdf/extract_abstract_core_keywords", methods=["GET"])
+def extract_abstract_core_keywords():
+    """
+    抽取论文摘要的关键词，关键词用于索引论文
+
+    Args:
+        pdf_id (int): pdf的id号码
+
+    Returns:
+        msg_code (int): 0表示正常，其他错误，见msg_content
+        msg_content (str): 错误信息
+        input (str): 输入模型的abstract
+        keywords (str): 返回提取的关键词，每个关键词用chr(2)分割
+        response (str): 模型生成的原始结果
+
+    """
+    response_msg = {"msg_code": 0, "msg_content": "success"}
+    request_json = request.get_json()
+    pdf_id = request_json["pdf_id"]
+    # 查数据库看文件是否存在，并获取文件的json数据
+    pdf_info = PdfInfo.query.filter_by(id=int(pdf_id)).first()
+    abstract = ""
+    if pdf_info:
+        abstract = pdf_info.abstract
+    else:
+        response_msg["msg_code"] = 1
+        response_msg["msg_content"] = f"id: {pdf_id}, file not found"
+        response = make_response("file not found", 200)
+        response.headers['msg_code'] = json.dumps(response_msg)
+        return response
+
+    if len(abstract) == 0:
+        response_msg["msg_code"] = 2
+        response_msg["msg_content"] = f"id: {pdf_id}, pdf not have abstract"
+        response_msg["keywords"] = ""
+
+    llm_api = app.config["LLM_URL"]
+    message_list = [
+        {"role": "user", "content": default_prompts.extract_abstract_core_keywords_prompt.format(prompt=abstract)}
+    ]
+    headers = {"Content-Type": "application/json"}
+    data_json = {
+        "message_list": message_list,
+        "temperature": app.config["TEMPERATURE"],
+        "top_k": app.config["TOP_K"],
+        "top_p": app.config["TOP_P"],
+        "repeat_penalty": app.config["REPETITION_PENALTY"],
+        "n_predict": 4096,
+        "stop": ["<|im_end|>"]
+    }
+    generate_info = requests.post(url=llm_api, data=json.dumps(data_json), headers=headers)
+    generate_info = json.loads(generate_info.text)
+    if generate_info["msg_code"] != 0:
+        response_msg["msg_code"] = 3
+        response_msg["msg_content"] = f"调用LLM接口失败：{generate_info['msg_content']}"
+
+    response = generate_info["response"]
+    def parse_response(response):
+        res_list = response.split("\n")
+        pattern = r'^\d+\.'
+        kw_list = []
+        for res in res_list:
+            res = res.strip()
+            if re.match(pattern, res):
+                kw = re.sub(pattern, '', res).strip()
+                kw_list.append(kw)
+        parse_res = chr(2).join(kw_list)
+        return parse_res
+
+    abstract_core_keywords = parse_response(response)
+    pdf_info.abstract_core_keywords = abstract_core_keywords
+    pdf_info.abstract_llm_generates = response
+
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        response_msg["msg_code"] = 4
+        response_msg["msg_content"] = f"将数据结果存储到mysql数据库出错：{e}"
+
+    response_msg["keywords"] = abstract_core_keywords
+    response_msg["response"] = response
+    response_msg["input"] = abstract
+
+    return response_msg
+
+
+# 对论文的摘要进行关键词提取
+@app.route("/pdf/extract_title_core_keywords", methods=["GET"])
+def extract_title_core_keywords():
+    """
+    抽取论文摘要的关键词，关键词用于索引论文
+
+    Args:
+        pdf_id (int): pdf的id号码
+
+    Returns:
+        msg_code (int): 0表示正常，其他错误，见msg_content
+        msg_content (str): 错误信息
+        input (str): 输入模型的title
+        keywords (str): 返回提取的关键词，每个关键词用chr(2)分割
+        response (str): 模型生成的原始结果
+
+    """
+    response_msg = {"msg_code": 0, "msg_content": "success"}
+    request_json = request.get_json()
+    pdf_id = request_json["pdf_id"]
+    # 查数据库看文件是否存在，并获取文件的json数据
+    pdf_info = PdfInfo.query.filter_by(id=int(pdf_id)).first()
+    title = ""
+    if pdf_info:
+        title = pdf_info.title
+    else:
+        response_msg["msg_code"] = 1
+        response_msg["msg_content"] = f"id: {pdf_id}, file not found"
+        response = make_response("file not found", 200)
+        response.headers['msg_code'] = json.dumps(response_msg)
+        return response
+
+    if len(title) == 0:
+        response_msg["msg_code"] = 2
+        response_msg["msg_content"] = f"id: {pdf_id}, pdf not have title"
+        response_msg["keywords"] = ""
+
+    llm_api = app.config["LLM_URL"]
+    message_list = [
+        {"role": "user", "content": default_prompts.extract_title_core_keywords_prompt.format(prompt=title)}
+    ]
+    headers = {"Content-Type": "application/json"}
+    data_json = {
+        "message_list": message_list,
+        "temperature": app.config["TEMPERATURE"],
+        "top_k": app.config["TOP_K"],
+        "top_p": app.config["TOP_P"],
+        "repeat_penalty": app.config["REPETITION_PENALTY"],
+        "n_predict": 4096,
+        "stop": ["<|im_end|>"]
+    }
+    generate_info = requests.post(url=llm_api, data=json.dumps(data_json), headers=headers)
+    generate_info = json.loads(generate_info.text)
+    if generate_info["msg_code"] != 0:
+        response_msg["msg_code"] = 3
+        response_msg["msg_content"] = f"调用LLM接口失败：{generate_info['msg_content']}"
+
+    response = generate_info["response"]
+    def parse_response(response):
+        res_list = response.split("\n")
+        pattern = r'^\d+\.'
+        kw_list = []
+        for res in res_list:
+            res = res.strip()
+            if re.match(pattern, res):
+                kw = re.sub(pattern, '', res).strip()
+                kw_list.append(kw)
+        parse_res = chr(2).join(kw_list)
+        return parse_res
+
+    title_core_keywords = parse_response(response)
+    pdf_info.title_core_keywords = title_core_keywords
+    pdf_info.title_llm_generates = response
+
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        response_msg["msg_code"] = 4
+        response_msg["msg_content"] = f"将数据结果存储到mysql数据库出错：{e}"
+
+    response_msg["keywords"] = title_core_keywords
+    response_msg["response"] = response
+    response_msg["input"] = title
+
+    return response_msg
+
+
+
+
+
+
+
+
+
 # 存储PDF的一些解析数据，例如关键词，总结，abstract中文翻译等等
 @app.route("/pdf/set_pdf_attribute_info", methods=["POST"])
 def set_pdf_attribute_info():
@@ -173,7 +357,9 @@ def set_pdf_attribute_info():
     response_msg = {"msg_code": 0, "msg_content": "success"}
     request_json = request.form.to_dict()
     file_id = request_json["data_id"]
-    file_name = request_json["file_name"]
+
+    # 暂不实现，后续有需要再实现
+    response_msg["msg_content"] = "The functionality of this interface has not been implemented yet. "
 
     # 如果存储失败，那么返回错误信息
     try:

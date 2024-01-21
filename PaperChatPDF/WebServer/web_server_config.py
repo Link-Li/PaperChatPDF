@@ -37,3 +37,10 @@ class TestingConfig(Config):
     PDF_TXT_SAVE_PATH = ROOT_PATH / "temp/pdf_txt"
     PDF_JSON_SAVE_PATH = ROOT_PATH / "temp/pdf_json"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    LLM_URL = "http://192.168.31.137:9001/llm_chat"
+
+    # yi default generate parameter
+    TEMPERATURE = 0.6
+    TOP_K = 50
+    TOP_P = 0.8
+    REPETITION_PENALTY = 1.0

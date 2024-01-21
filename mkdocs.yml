@@ -112,9 +112,11 @@ copyright: Copyright &copy; Link-Li # 左下角的版权声明
 #    - 'Release Notes': 'release-notes.md'
 
 nav:
-  - Home:
-     - 'WebServer': WebServer/web_server.md
-     - 'PDFParse': WebServer/PDFParse/pdf_to_json.md
+  - Home: index.md
+  - WebServer:
+    - Server: WebServer/web_server.md
+    - PDFParse: WebServer/PDFParse/pdf_to_json.md
+  - ModelServer: ModelServer/llm_server.md
 #  - Scheduler:
 #  - ModelServer:
 #  - DB:
