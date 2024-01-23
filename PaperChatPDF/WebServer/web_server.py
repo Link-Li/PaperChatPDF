@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 import uuid
 import requests
+import subprocess
 
 from flask import app, request, Flask, send_file, make_response
 from werkzeug.utils import secure_filename
@@ -44,6 +45,44 @@ def api_test():
         str (str): Hello World Web Server!
     """
     return "Hello World Web Server!"
+
+
+@app.route("/get_system_info", methods=["GET"])
+def get_system_info():
+    """
+    返回服务器的cpu利用率，gpu利用率和内存使用量
+
+    :return:
+        msg_code (int): 0表示正常，其他错误，见msg_content
+        msg_content (str): 错误信息
+        cpu_usage (float): cpu利用率
+        mem_usage (float): 内存使用比例
+        gpu_usage (float): gpu利用率
+    """
+    response_msg = {"msg_code": 0, "msg_content": ""}
+
+    command = 'top -bn1 | grep "Cpu(s)" | sed "s/.*, *\\([0-9.]*\\)%* id.*/\\1/" | awk \'{print 100 - $1}\''
+    cpu_usage_res = subprocess.run(command, shell=True, capture_output=True)
+    if cpu_usage_res.returncode == 0:
+        response_msg["cpu_usage"] = float(cpu_usage_res.stdout.decode("utf-8").strip())
+    else:
+        response_msg["msg_code"] = 1
+        response_msg["msg_content"] += f"get cpu info error {cpu_usage_res.stderr.decode('utf-8').strip()}"
+
+    command = "free -m | sed -n '2p' | awk '{printf \"%f\",($3)/$2*100}'"
+    mem_usage_res = subprocess.run(command, shell=True, capture_output=True)
+    if mem_usage_res.returncode == 0:
+        response_msg["mem_usage"] = float(mem_usage_res.stdout.decode("utf-8").strip())
+    else:
+        response_msg["msg_code"] = 2
+        response_msg["msg_content"] += f"get memory info error {mem_usage_res.stderr.decode('utf-8').strip()}"
+
+#         TODO: 获取GPU的利用率，使用nvidia-smi-py类的工具获取
+
+    if response_msg["msg_code"] == 0:
+        response_msg["msg_content"] = "success"
+    return response_msg
+
 
 
 # 解析PDF
