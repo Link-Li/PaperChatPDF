@@ -1,6 +1,6 @@
 pip
 ```
-pip install flask flask_sqlalchemy gunicorn PyMuPDF pymysql
+pip install flask flask_sqlalchemy gunicorn PyMuPDF pymysql nvidia-ml-py
 
 ```
 

@@ -15,6 +15,7 @@ import subprocess
 
 from flask import app, request, Flask, send_file, make_response
 from werkzeug.utils import secure_filename
+import pynvml
 
 from create_flask_app import create_app, db
 from web_server_config import TestingConfig
@@ -22,11 +23,11 @@ from PDFParse.pdf_to_json import parse_pdf_to_txt, parse_pdf_text_to_json
 from MySQL.table_class import PdfInfo
 import default_prompts
 
-
 app = create_app()
 
 with app.app_context():
     db.create_all()
+
 
 def check_file_type(filename, type):
     if '.' in filename and filename.split('.')[-1] == type:
@@ -57,7 +58,7 @@ def get_system_info():
         msg_content (str): 错误信息
         cpu_usage (float): cpu利用率
         mem_usage (float): 内存使用比例
-        gpu_usage (float): gpu利用率
+        gpu_usage (str): gpu利用率, gpu_index \t gpu_usage chr(2) gpu_index \t gpu_usage
     """
     response_msg = {"msg_code": 0, "msg_content": ""}
 
@@ -77,7 +78,17 @@ def get_system_info():
         response_msg["msg_code"] = 2
         response_msg["msg_content"] += f"get memory info error {mem_usage_res.stderr.decode('utf-8').strip()}"
 
-#         TODO: 获取GPU的利用率，使用nvidia-smi-py类的工具获取
+    try:
+        pynvml.nvmlInit()
+        gpu_usage_list = []
+        for index in pynvml.nvmlDeviceGetCount():
+            handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+            gpu_utilization = pynvml.nvmlDeviceGetUtilizationRates(handle)
+            gpu_usage_list.append(f"{index}\t{gpu_utilization.gpu}")
+        response_msg["gpu_usage"] = chr(2).join(gpu_usage_list)
+    except Exception as e:
+        response_msg["msg_code"] = 3
+        response_msg["msg_content"] = f"get gpu usage info error {e}"
 
     if response_msg["msg_code"] == 0:
         response_msg["msg_content"] = "success"
